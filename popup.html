@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omni Tab Manager</title>
+    <link rel="stylesheet" href="css/popup.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">🗂️</div>
+                <h1>Omni</h1>
+            </div>
+            <div class="header-actions">
+                <button id="openManager" class="btn btn-secondary" title="Open Manager">
+                    <span class="icon">🚀</span>
+                    Manager
+                </button>
+                <button id="convertAllTabs" class="btn btn-primary" title="Convert all tabs">
+                    <span class="icon">📋</span>
+                    Convert All
+                </button>
+                <button id="settingsBtn" class="btn btn-secondary" title="Settings">
+                    <span class="icon">⚙️</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Search Bar -->
+        <div class="search-section">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search tabs, sessions, workspaces..." class="search-input">
+                <button id="searchBtn" class="search-btn">
+                    <span class="icon">🔍</span>
+                </button>
+            </div>
+            <div id="searchSuggestions" class="search-suggestions hidden"></div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="dashboard">
+                <span class="icon">📊</span>
+                Dashboard
+            </button>
+            <button class="nav-tab" data-tab="workspaces">
+                <span class="icon">🗂️</span>
+                Workspaces
+            </button>
+            <button class="nav-tab" data-tab="sessions">
+                <span class="icon">💾</span>
+                Sessions
+            </button>
+            <button class="nav-tab" data-tab="tabs">
+                <span class="icon">📑</span>
+                All Tabs
+            </button>
+            <button class="nav-tab" data-tab="development">
+                <span class="icon">🔧</span>
+                Dev
+            </button>
+        </nav>
+
+        <!-- Content Sections -->
+        <main class="content">
+            <!-- Dashboard Tab -->
+            <section id="dashboardTab" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="openTabsCount">0</div>
+                        <div class="stat-label">Open Tabs</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="sessionsCount">0</div>
+                        <div class="stat-label">Saved Sessions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="workspacesCount">0</div>
+                        <div class="stat-label">Workspaces</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="suspendedTabsCount">0</div>
+                        <div class="stat-label">Suspended</div>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <h3>Quick Actions</h3>
+                    <div class="action-buttons">
+                        <button id="saveCurrentSession" class="action-btn">
+                            <span class="icon">💾</span>
+                            Save Current Session
+                        </button>
+                        <button id="createWorkspace" class="action-btn">
+                            <span class="icon">➕</span>
+                            New Workspace
+                        </button>
+                        <button id="suspendInactiveTabs" class="action-btn">
+                            <span class="icon">😴</span>
+                            Suspend Inactive
+                        </button>
+                    </div>
+                </div>
+
+                <div class="recent-items">
+                    <h3>Recent Sessions</h3>
+                    <div id="recentSessions" class="recent-list"></div>
+                </div>
+            </section>
+
+            <!-- Workspaces Tab -->
+            <section id="workspacesTab" class="tab-content">
+                <div class="section-header">
+                    <h2>Workspaces</h2>
+                    <button id="newWorkspaceBtn" class="btn btn-primary">
+                        <span class="icon">➕</span>
+                        New Workspace
+                    </button>
+                </div>
+                <div id="workspacesList" class="workspaces-list"></div>
+            </section>
+
+            <!-- Sessions Tab -->
+            <section id="sessionsTab" class="tab-content">
+                <div class="section-header">
+                    <h2>Saved Sessions</h2>
+                    <div class="session-actions">
+                        <button id="saveSessionBtn" class="btn btn-primary">
+                            <span class="icon">💾</span>
+                            Save Current
+                        </button>
+                        <select id="sessionSort" class="select">
+                            <option value="recent">Most Recent</option>
+                            <option value="name">Name A-Z</option>
+                            <option value="tabs">Tab Count</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="sessionsList" class="sessions-list"></div>
+            </section>
+
+            <!-- All Tabs Tab -->
+            <section id="tabsTab" class="tab-content">
+                <div class="section-header">
+                    <h2>All Tabs</h2>
+                    <div class="tab-actions">
+                        <select id="tabFilter" class="select">
+                            <option value="all">All Tabs</option>
+                            <option value="active">Active Only</option>
+                            <option value="suspended">Suspended Only</option>
+                            <option value="grouped">Grouped Only</option>
+                        </select>
+                        <select id="tabSort" class="select">
+                            <option value="window">By Window</option>
+                            <option value="domain">By Domain</option>
+                            <option value="recent">Recently Used</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="tabsList" class="tabs-list"></div>
+            </section>
+
+            <!-- Search Results -->
+            <section id="searchResults" class="tab-content hidden">
+                <div class="section-header">
+                    <h2>Search Results</h2>
+                    <button id="clearSearch" class="btn btn-secondary">Clear</button>
+                </div>
+                <div id="searchResultsContent" class="search-results-content"></div>
+            </section>
+
+            <!-- Development Tab -->
+            <section id="developmentTab" class="tab-content">
+                <div class="section-header">
+                    <h2>Development Tools</h2>
+                    <button id="refreshDevStats" class="btn btn-secondary">
+                        <span class="icon">🔄</span>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Storage Stats -->
+                <div class="dev-section">
+                    <h3>Storage Statistics</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number" id="storageUsed">0 KB</div>
+                            <div class="stat-label">Storage Used</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="storageQuota">0 MB</div>
+                            <div class="stat-label">Storage Quota</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="storageItems">0</div>
+                            <div class="stat-label">Total Items</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="cacheSize">0 KB</div>
+                            <div class="stat-label">Cache Size</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Debug Actions -->
+                <div class="dev-section">
+                    <h3>Debug Actions</h3>
+                    <div class="action-buttons">
+                        <button id="exportData" class="action-btn">
+                            <span class="icon">📤</span>
+                            Export All Data
+                        </button>
+                        <button id="importData" class="action-btn">
+                            <span class="icon">📥</span>
+                            Import Data
+                        </button>
+                        <button id="clearStorage" class="action-btn">
+                            <span class="icon">🗑️</span>
+                            Clear All Storage
+                        </button>
+                        <button id="resetExtension" class="action-btn">
+                            <span class="icon">♻️</span>
+                            Reset Extension
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Performance Metrics -->
+                <div class="dev-section">
+                    <h3>Performance Metrics</h3>
+                    <div id="performanceMetrics" class="metrics-display">
+                        <div class="metric-item">
+                            <span class="metric-label">Memory Usage:</span>
+                            <span class="metric-value" id="memoryUsage">-- MB</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Active Tabs:</span>
+                            <span class="metric-value" id="activeTabsCount">--</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Suspended Tabs:</span>
+                            <span class="metric-value" id="suspendedCount">--</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Extension Version:</span>
+                            <span class="metric-value" id="extensionVersion">1.0.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Console Logs -->
+                <div class="dev-section">
+                    <h3>Console Output</h3>
+                    <div class="console-controls">
+                        <select id="logLevel" class="select">
+                            <option value="all">All Logs</option>
+                            <option value="error">Errors Only</option>
+                            <option value="warn">Warnings & Errors</option>
+                            <option value="info">Info & Above</option>
+                        </select>
+                        <button id="clearConsole" class="btn btn-secondary">Clear</button>
+                    </div>
+                    <div id="consoleOutput" class="console-output"></div>
+                </div>
+
+                <!-- Storage Data Viewer -->
+                <div class="dev-section">
+                    <h3>Storage Data</h3>
+                    <div class="data-viewer-controls">
+                        <select id="dataType" class="select">
+                            <option value="sessions">Sessions</option>
+                            <option value="workspaces">Workspaces</option>
+                            <option value="suspendedTabs">Suspended Tabs</option>
+                            <option value="settings">Settings</option>
+                            <option value="searchHistory">Search History</option>
+                        </select>
+                        <button id="viewData" class="btn btn-secondary">View</button>
+                    </div>
+                    <pre id="dataViewer" class="data-viewer"></pre>
+                </div>
+
+                <!-- Test Features -->
+                <div class="dev-section">
+                    <h3>Test Features</h3>
+                    <div class="action-buttons">
+                        <button id="testCrash" class="action-btn">
+                            <span class="icon">💥</span>
+                            Simulate Crash
+                        </button>
+                        <button id="testNotification" class="action-btn">
+                            <span class="icon">🔔</span>
+                            Test Notification
+                        </button>
+                        <button id="generateTestData" class="action-btn">
+                            <span class="icon">🎲</span>
+                            Generate Test Data
+                        </button>
+                        <button id="runDiagnostics" class="action-btn">
+                            <span class="icon">🔍</span>
+                            Run Diagnostics
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="workspaceModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="workspaceModalTitle">Create Workspace</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="workspaceName">Workspace Name</label>
+                    <input type="text" id="workspaceName" placeholder="Enter workspace name">
+                </div>
+                <div class="form-group">
+                    <label for="workspaceColor">Color</label>
+                    <div class="color-picker">
+                        <input type="color" id="workspaceColor" value="#4285f4">
+                        <div class="color-presets">
+                            <button class="color-preset" data-color="#4285f4" style="background: #4285f4"></button>
+                            <button class="color-preset" data-color="#ea4335" style="background: #ea4335"></button>
+                            <button class="color-preset" data-color="#34a853" style="background: #34a853"></button>
+                            <button class="color-preset" data-color="#fbbc05" style="background: #fbbc05"></button>
+                            <button class="color-preset" data-color="#9c27b0" style="background: #9c27b0"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelWorkspace" class="btn btn-secondary">Cancel</button>
+                <button id="saveWorkspace" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sessionModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Save Session</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="sessionName">Session Name</label>
+                    <input type="text" id="sessionName" placeholder="Enter session name">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="includeAllWindows" checked>
+                        Include all windows
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelSession" class="btn btn-secondary">Cancel</button>
+                <button id="saveSessionConfirm" class="btn btn-primary">Save Session</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="loading-spinner hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="src/tab-manager.js"></script>
+    <script src="src/workspace-manager.js"></script>
+    <script src="src/search-manager.js"></script>
+    <script src="src/popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Omni Tab Manager",
+  "version": "1.0.0",
+  "description": "Ultimate tab management and workspace organization solution",
+  "permissions": [
+    "tabs",
+    "storage",
+    "activeTab",
+    "tabGroups"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Omni Tab Manager"
+  },
+  "commands": {
+    "convert-all-tabs": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+O",
+        "mac": "Command+Shift+O"
+      },
+      "description": "Convert all tabs to Omni list"
+    },
+    "open-popup": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+T",
+        "mac": "Command+Shift+T"
+      },
+      "description": "Open Omni popup"
+    }
+  }
+}

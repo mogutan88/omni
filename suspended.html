@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tab Suspended - Omni</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 500px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            opacity: 0.8;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+
+        .tab-info {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+            text-align: left;
+        }
+
+        .tab-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            word-break: break-word;
+        }
+
+        .tab-url {
+            font-size: 14px;
+            opacity: 0.8;
+            word-break: break-all;
+        }
+
+        .actions {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 32px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: rgba(26, 115, 232, 0.8);
+            border-color: rgba(26, 115, 232, 0.9);
+        }
+
+        .btn-primary:hover {
+            background: rgba(26, 115, 232, 1);
+        }
+
+        .stats {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            font-size: 14px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            opacity: 0.8;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin: 20px;
+                padding: 24px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .actions {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">😴</div>
+        <h1>Tab Suspended</h1>
+        <p>This tab has been suspended to save memory and improve performance.</p>
+        
+        <div class="tab-info">
+            <div class="tab-title" id="tabTitle">Loading...</div>
+            <div class="tab-url" id="tabUrl">Loading...</div>
+        </div>
+
+        <div class="actions">
+            <button id="restoreBtn" class="btn btn-primary">
+                <span>▶️</span>
+                Restore Tab
+            </button>
+            <button id="omniBtn" class="btn">
+                <span>🗂️</span>
+                Open Omni
+            </button>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-number" id="memorySaved">~95%</div>
+                <div class="stat-label">Memory Saved</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number" id="suspendTime">--</div>
+                <div class="stat-label">Suspended For</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class SuspendedPage {
+            constructor() {
+                this.tabId = this.getTabIdFromUrl();
+                this.suspendedTab = null;
+                this.initialize();
+            }
+
+            getTabIdFromUrl() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get('id');
+            }
+
+            async initialize() {
+                await this.loadSuspendedTabData();
+                this.setupEventListeners();
+                this.updateSuspendTime();
+                setInterval(() => this.updateSuspendTime(), 60000); // Update every minute
+            }
+
+            async loadSuspendedTabData() {
+                try {
+                    const data = await chrome.storage.local.get(['suspendedTabs']);
+                    const suspendedTabs = data.suspendedTabs || [];
+                    this.suspendedTab = suspendedTabs.find(tab => tab.id.toString() === this.tabId);
+
+                    if (this.suspendedTab) {
+                        document.getElementById('tabTitle').textContent = this.suspendedTab.title;
+                        document.getElementById('tabUrl').textContent = this.suspendedTab.url;
+                    } else {
+                        document.getElementById('tabTitle').textContent = 'Unknown Tab';
+                        document.getElementById('tabUrl').textContent = 'Tab data not found';
+                    }
+                } catch (error) {
+                    console.error('Error loading suspended tab data:', error);
+                    document.getElementById('tabTitle').textContent = 'Error Loading Tab';
+                    document.getElementById('tabUrl').textContent = 'Please try refreshing';
+                }
+            }
+
+            setupEventListeners() {
+                document.getElementById('restoreBtn').addEventListener('click', () => {
+                    this.restoreTab();
+                });
+
+                document.getElementById('omniBtn').addEventListener('click', () => {
+                    this.openOmni();
+                });
+
+                // Handle keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        this.restoreTab();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this.openOmni();
+                    }
+                });
+            }
+
+            async restoreTab() {
+                if (!this.suspendedTab) {
+                    alert('Cannot restore tab: tab data not found');
+                    return;
+                }
+
+                try {
+                    // Update the current tab to the original URL
+                    await chrome.tabs.update(parseInt(this.tabId), { 
+                        url: this.suspendedTab.url 
+                    });
+
+                    // Remove from suspended tabs list
+                    const data = await chrome.storage.local.get(['suspendedTabs']);
+                    const suspendedTabs = data.suspendedTabs || [];
+                    const updatedTabs = suspendedTabs.filter(tab => tab.id.toString() !== this.tabId);
+                    await chrome.storage.local.set({ suspendedTabs: updatedTabs });
+
+                } catch (error) {
+                    console.error('Error restoring tab:', error);
+                    // Fallback: try to navigate directly
+                    window.location.href = this.suspendedTab.url;
+                }
+            }
+
+            async openOmni() {
+                try {
+                    await chrome.action.openPopup();
+                } catch (error) {
+                    // If popup fails, try to open the extension page
+                    try {
+                        await chrome.tabs.create({
+                            url: chrome.runtime.getURL('popup.html')
+                        });
+                    } catch (err) {
+                        console.error('Error opening Omni:', err);
+                    }
+                }
+            }
+
+            updateSuspendTime() {
+                if (!this.suspendedTab) return;
+
+                const now = Date.now();
+                const suspendedAt = this.suspendedTab.suspended || now;
+                const diffMs = now - suspendedAt;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+
+                let timeText;
+                if (diffMins < 1) {
+                    timeText = 'Just now';
+                } else if (diffMins < 60) {
+                    timeText = `${diffMins}m`;
+                } else if (diffHours < 24) {
+                    timeText = `${diffHours}h`;
+                } else {
+                    timeText = `${diffDays}d`;
+                }
+
+                document.getElementById('suspendTime').textContent = timeText;
+            }
+        }
+
+        // Initialize the suspended page
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+            new SuspendedPage();
+        } else {
+            // Fallback for when extension APIs are not available
+            document.getElementById('tabTitle').textContent = 'Extension Not Available';
+            document.getElementById('tabUrl').textContent = 'Please reload this tab';
+            document.getElementById('restoreBtn').addEventListener('click', () => {
+                window.location.reload();
+            });
+        }
+    </script>
+</body>
+</html>

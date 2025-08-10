@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omni Tab Manager</title>
+    <link rel="stylesheet" href="css/manager.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">🗂️</div>
+                    <h1 class="logo-text">Omni</h1>
+                </div>
+                <div class="user-info">
+                    <div class="user-avatar">👤</div>
+                    <div class="user-details">
+                        <div class="user-name">Tab Manager</div>
+                        <div class="user-status">Active</div>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Main</div>
+                    <button class="nav-item active" data-view="overview">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-label">Overview</span>
+                    </button>
+                    <button class="nav-item" data-view="workspaces">
+                        <span class="nav-icon">🗂️</span>
+                        <span class="nav-label">Workspaces</span>
+                        <span class="nav-badge" id="workspaceCount">0</span>
+                    </button>
+                    <button class="nav-item" data-view="sessions">
+                        <span class="nav-icon">💾</span>
+                        <span class="nav-label">Sessions</span>
+                        <span class="nav-badge" id="sessionCount">0</span>
+                    </button>
+                    <button class="nav-item" data-view="tabs">
+                        <span class="nav-icon">📑</span>
+                        <span class="nav-label">All Tabs</span>
+                        <span class="nav-badge" id="tabCount">0</span>
+                    </button>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Tools</div>
+                    <button class="nav-item" data-view="search">
+                        <span class="nav-icon">🔍</span>
+                        <span class="nav-label">Search</span>
+                    </button>
+                    <button class="nav-item" data-view="history">
+                        <span class="nav-icon">📜</span>
+                        <span class="nav-label">History</span>
+                    </button>
+                    <button class="nav-item" data-view="analytics">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-label">Analytics</span>
+                    </button>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Settings</div>
+                    <button class="nav-item" data-view="preferences">
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-label">Preferences</span>
+                    </button>
+                    <button class="nav-item" data-view="development">
+                        <span class="nav-icon">🔧</span>
+                        <span class="nav-label">Development</span>
+                    </button>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="quick-action-btn" id="quickSave" title="Quick Save Session">
+                    <span class="icon">💾</span>
+                </button>
+                <button class="quick-action-btn" id="quickConvert" title="Convert All Tabs">
+                    <span class="icon">📋</span>
+                </button>
+                <button class="quick-action-btn" id="openPopup" title="Open Popup">
+                    <span class="icon">🪟</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header Bar -->
+            <header class="header-bar">
+                <div class="header-left">
+                    <button class="menu-toggle" id="menuToggle">☰</button>
+                    <h2 class="page-title" id="pageTitle">Overview</h2>
+                </div>
+
+                <div class="header-center">
+                    <div class="search-bar">
+                        <input type="text" class="search-input" id="globalSearch" placeholder="Search tabs, sessions, workspaces...">
+                        <button class="search-btn">
+                            <span class="icon">🔍</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <button class="header-action" id="refreshBtn" title="Refresh">
+                        <span class="icon">🔄</span>
+                    </button>
+                    <button class="header-action" id="notificationBtn" title="Notifications">
+                        <span class="icon">🔔</span>
+                        <span class="notification-dot"></span>
+                    </button>
+                    <button class="header-action" id="helpBtn" title="Help">
+                        <span class="icon">❓</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Content Views -->
+            <div class="content-area">
+                <!-- Overview View -->
+                <section id="overviewView" class="view-container active">
+                    <div class="dashboard-grid">
+                        <!-- Statistics Cards -->
+                        <div class="stat-card large">
+                            <div class="stat-header">
+                                <h3>Memory Saved</h3>
+                                <span class="stat-icon">💾</span>
+                            </div>
+                            <div class="stat-value" id="memorySaved">0 MB</div>
+                            <div class="stat-chart">
+                                <canvas id="memoryChart"></canvas>
+                            </div>
+                            <div class="stat-footer">
+                                <span class="stat-change positive">+15%</span>
+                                <span class="stat-period">vs last week</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <h3>Active Tabs</h3>
+                                <span class="stat-icon">📑</span>
+                            </div>
+                            <div class="stat-value" id="activeTabs">0</div>
+                            <div class="stat-footer">
+                                <span class="stat-detail">Across all windows</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <h3>Suspended</h3>
+                                <span class="stat-icon">😴</span>
+                            </div>
+                            <div class="stat-value" id="suspendedTabs">0</div>
+                            <div class="stat-footer">
+                                <span class="stat-detail">Saving memory</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <h3>Sessions</h3>
+                                <span class="stat-icon">📁</span>
+                            </div>
+                            <div class="stat-value" id="totalSessions">0</div>
+                            <div class="stat-footer">
+                                <span class="stat-detail">Saved for later</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <h3>Workspaces</h3>
+                                <span class="stat-icon">🗂️</span>
+                            </div>
+                            <div class="stat-value" id="totalWorkspaces">0</div>
+                            <div class="stat-footer">
+                                <span class="stat-detail">Organized</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="activity-section">
+                        <div class="section-header">
+                            <h3>Recent Activity</h3>
+                            <button class="btn-text">View All</button>
+                        </div>
+                        <div class="activity-list" id="activityList">
+                            <!-- Activity items will be inserted here -->
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="quick-actions-grid">
+                        <button class="quick-action-card">
+                            <span class="action-icon">🚀</span>
+                            <span class="action-label">New Workspace</span>
+                        </button>
+                        <button class="quick-action-card">
+                            <span class="action-icon">💾</span>
+                            <span class="action-label">Save Session</span>
+                        </button>
+                        <button class="quick-action-card">
+                            <span class="action-icon">🔄</span>
+                            <span class="action-label">Sync Data</span>
+                        </button>
+                        <button class="quick-action-card">
+                            <span class="action-icon">📤</span>
+                            <span class="action-label">Export</span>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Workspaces View -->
+                <section id="workspacesView" class="view-container">
+                    <div class="view-header">
+                        <div class="view-actions">
+                            <button class="btn btn-primary" id="newWorkspaceBtn">
+                                <span class="icon">➕</span>
+                                New Workspace
+                            </button>
+                            <div class="view-filters">
+                                <select class="filter-select">
+                                    <option>All Workspaces</option>
+                                    <option>Active</option>
+                                    <option>Archived</option>
+                                </select>
+                                <button class="btn btn-icon" title="Grid View">
+                                    <span class="icon">⊞</span>
+                                </button>
+                                <button class="btn btn-icon" title="List View">
+                                    <span class="icon">☰</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="workspace-grid" id="workspaceGrid">
+                        <!-- Workspace cards will be inserted here -->
+                    </div>
+                </section>
+
+                <!-- Sessions View -->
+                <section id="sessionsView" class="view-container">
+                    <div class="view-header">
+                        <div class="view-actions">
+                            <button class="btn btn-primary" id="saveSessionBtn">
+                                <span class="icon">💾</span>
+                                Save Current
+                            </button>
+                            <div class="view-filters">
+                                <input type="text" class="filter-input" placeholder="Filter sessions...">
+                                <select class="filter-select">
+                                    <option>Recent</option>
+                                    <option>Name A-Z</option>
+                                    <option>Tab Count</option>
+                                    <option>Date Created</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sessions-table">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" class="select-all"></th>
+                                    <th>Name</th>
+                                    <th>Tabs</th>
+                                    <th>Created</th>
+                                    <th>Last Accessed</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sessionsTableBody">
+                                <!-- Session rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bulk-actions" id="bulkActions">
+                        <span class="selected-count">0 selected</span>
+                        <button class="btn btn-sm">Restore</button>
+                        <button class="btn btn-sm">Export</button>
+                        <button class="btn btn-sm btn-danger">Delete</button>
+                    </div>
+                </section>
+
+                <!-- Tabs View -->
+                <section id="tabsView" class="view-container">
+                    <div class="view-header">
+                        <div class="view-actions">
+                            <div class="tab-stats">
+                                <span class="stat-item">
+                                    <span class="stat-label">Total:</span>
+                                    <span class="stat-value" id="totalTabCount">0</span>
+                                </span>
+                                <span class="stat-item">
+                                    <span class="stat-label">Active:</span>
+                                    <span class="stat-value" id="activeTabCount">0</span>
+                                </span>
+                                <span class="stat-item">
+                                    <span class="stat-label">Suspended:</span>
+                                    <span class="stat-value" id="suspendedTabCount">0</span>
+                                </span>
+                            </div>
+                            <div class="view-filters">
+                                <button class="filter-chip active">All</button>
+                                <button class="filter-chip">Active</button>
+                                <button class="filter-chip">Suspended</button>
+                                <button class="filter-chip">Grouped</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tabs-container" id="tabsContainer">
+                        <!-- Tab groups and items will be inserted here -->
+                    </div>
+                </section>
+
+                <!-- Search View -->
+                <section id="searchView" class="view-container">
+                    <div class="search-container">
+                        <div class="search-header">
+                            <input type="text" class="large-search-input" id="searchQuery" placeholder="What are you looking for?" autofocus>
+                            <div class="search-filters">
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" checked> Tabs
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" checked> Sessions
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox" checked> Workspaces
+                                </label>
+                                <label class="filter-checkbox">
+                                    <input type="checkbox"> History
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="search-results" id="searchResults">
+                            <!-- Search results will be inserted here -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- History View -->
+                <section id="historyView" class="view-container">
+                    <div class="view-header">
+                        <div class="view-actions">
+                            <div class="date-range">
+                                <input type="date" class="date-input" id="startDate">
+                                <span>to</span>
+                                <input type="date" class="date-input" id="endDate">
+                            </div>
+                            <button class="btn btn-secondary">Clear History</button>
+                        </div>
+                    </div>
+
+                    <div class="history-timeline" id="historyTimeline">
+                        <!-- History items will be inserted here -->
+                    </div>
+                </section>
+
+                <!-- Analytics View -->
+                <section id="analyticsView" class="view-container">
+                    <div class="analytics-dashboard">
+                        <div class="chart-container">
+                            <h3>Tab Usage Over Time</h3>
+                            <canvas id="usageChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>Top Domains</h3>
+                            <canvas id="domainsChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>Memory Savings</h3>
+                            <canvas id="savingsChart"></canvas>
+                        </div>
+                        <div class="metrics-grid">
+                            <div class="metric">
+                                <div class="metric-label">Avg. Tabs/Day</div>
+                                <div class="metric-value">47</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Peak Usage</div>
+                                <div class="metric-value">3:00 PM</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Memory Saved</div>
+                                <div class="metric-value">2.3 GB</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Sessions/Week</div>
+                                <div class="metric-value">12</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Preferences View -->
+                <section id="preferencesView" class="view-container">
+                    <div class="settings-container">
+                        <div class="settings-section">
+                            <h3>General Settings</h3>
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <span>Auto-save sessions</span>
+                                    <input type="checkbox" class="toggle-switch" checked>
+                                </label>
+                                <p class="setting-description">Automatically save your tabs when closing windows</p>
+                            </div>
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <span>Suspend inactive tabs</span>
+                                    <input type="checkbox" class="toggle-switch" checked>
+                                </label>
+                                <p class="setting-description">Suspend tabs after period of inactivity</p>
+                            </div>
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <span>Suspension timeout</span>
+                                    <input type="number" class="setting-input" value="30" min="5" max="120">
+                                    <span>minutes</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h3>Appearance</h3>
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <span>Theme</span>
+                                    <select class="setting-select">
+                                        <option>Light</option>
+                                        <option>Dark</option>
+                                        <option>System</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="setting-item">
+                                <label class="setting-label">
+                                    <span>Compact mode</span>
+                                    <input type="checkbox" class="toggle-switch">
+                                </label>
+                                <p class="setting-description">Reduce spacing for more content</p>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h3>Data & Privacy</h3>
+                            <div class="setting-item">
+                                <button class="btn btn-secondary">Export All Data</button>
+                                <button class="btn btn-secondary">Import Data</button>
+                            </div>
+                            <div class="setting-item">
+                                <button class="btn btn-danger">Clear All Data</button>
+                                <p class="setting-description">This will remove all saved sessions and settings</p>
+                            </div>
+                        </div>
+
+                        <div class="settings-actions">
+                            <button class="btn btn-primary">Save Changes</button>
+                            <button class="btn btn-secondary">Reset to Defaults</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Development View -->
+                <section id="developmentView" class="view-container">
+                    <!-- Copy development content from popup -->
+                    <div class="dev-container">
+                        <!-- Development tools content will be here -->
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="modal-overlay hidden"></div>
+
+    <div id="workspaceModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Workspace</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Workspace Name</label>
+                    <input type="text" class="form-input" id="workspaceName" placeholder="Enter workspace name">
+                </div>
+                <div class="form-group">
+                    <label>Color</label>
+                    <div class="color-picker">
+                        <button class="color-option" data-color="#4285f4" style="background: #4285f4"></button>
+                        <button class="color-option" data-color="#ea4335" style="background: #ea4335"></button>
+                        <button class="color-option" data-color="#34a853" style="background: #34a853"></button>
+                        <button class="color-option" data-color="#fbbc05" style="background: #fbbc05"></button>
+                        <button class="color-option" data-color="#9c27b0" style="background: #9c27b0"></button>
+                        <button class="color-option" data-color="#ff6d00" style="background: #ff6d00"></button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Description (optional)</label>
+                    <textarea class="form-textarea" id="workspaceDescription" placeholder="Add a description"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary">Cancel</button>
+                <button class="btn btn-primary">Create Workspace</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="src/tab-manager.js"></script>
+    <script src="src/workspace-manager.js"></script>
+    <script src="src/search-manager.js"></script>
+    <script src="src/manager.js"></script>
+</body>
+</html>
