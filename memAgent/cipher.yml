@@ -1,0 +1,58 @@
+name: omni-extension-memory-agent
+description: Memory agent for Omni Chrome Extension development project
+
+# Memory configuration
+memory:
+  provider: "in-memory"  # Use in-memory storage for development
+  max_entries: 1000
+  retention_days: 90
+
+# AI Provider configuration - using Claude (Anthropic)
+ai:
+  provider: "anthropic"
+  model: "claude-3-sonnet-20240229"
+  temperature: 0.3
+  max_tokens: 2000
+
+# Project-specific memory categories
+categories:
+  - name: "architecture"
+    description: "System architecture decisions and patterns"
+  - name: "features"
+    description: "Implemented features and functionality"
+  - name: "bugs_fixed" 
+    description: "Bug fixes and solutions discovered"
+  - name: "ai_workflow"
+    description: "AI development workflow and tool usage"
+  - name: "technical_decisions"
+    description: "Technical decisions and rationale"
+  - name: "chrome_extension_quirks"
+    description: "Chrome extension specific challenges and solutions"
+
+# Context for the agent
+context:
+  project_name: "Omni Extension"
+  project_type: "Chrome Extension"
+  development_stage: "MVP Complete"
+  key_technologies:
+    - "Chrome Extension Manifest V3"
+    - "Chrome Sync API"
+    - "JavaScript ES6+"
+    - "HTML/CSS"
+    - "Chrome Storage API"
+  ai_tools_used:
+    - "Claude Code"
+    - "Gemini CLI"
+    - "Codex CLI" 
+    - "Devin"
+
+# Automatic memory capture patterns
+capture_patterns:
+  - pattern: "bug.*fix"
+    category: "bugs_fixed"
+  - pattern: "feature.*implement"
+    category: "features"
+  - pattern: "architecture.*decision"
+    category: "architecture"
+  - pattern: "chrome.*extension"
+    category: "chrome_extension_quirks"

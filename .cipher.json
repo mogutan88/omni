@@ -1,0 +1,40 @@
+{
+  "name": "omni-extension",
+  "description": "Omni Chrome Extension - AI-powered tab and session management tool",
+  "version": "1.0.0",
+  "type": "chrome-extension",
+  "technologies": [
+    "JavaScript",
+    "Chrome Extension API",
+    "HTML/CSS",
+    "Chrome Sync API",
+    "Manifest V3"
+  ],
+  "ai_tools_used": [
+    "Claude Code",
+    "Gemini CLI", 
+    "Codex CLI",
+    "Devin"
+  ],
+  "memory_categories": [
+    "architecture",
+    "features", 
+    "bugs_fixed",
+    "ai_workflow",
+    "technical_decisions",
+    "chrome_extension_quirks"
+  ],
+  "project_context": {
+    "bootcamp": "AI Accelerator Bootcamp 2025",
+    "goal": "Create comprehensive Chrome tab/session management extension",
+    "development_approach": "AI-driven development workflow",
+    "key_features": [
+      "Tab suspension and restoration",
+      "Session management with persistence", 
+      "Universal search across tabs and sessions",
+      "Window grouping preservation",
+      "Export/import functionality",
+      "Chrome Sync API integration"
+    ]
+  }
+}
