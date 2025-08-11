@@ -455,6 +455,7 @@ class OmniPopup {
   }
 
   async handleSearchInput(query) {
+    console.log('handleSearchInput called with:', query); // Debug log
     clearTimeout(this.searchTimeout);
     
     if (query.length === 0) {
@@ -465,18 +466,21 @@ class OmniPopup {
 
     // Show search results for queries with 2+ characters
     if (query.length >= 2) {
+      console.log('Query length >= 2, performing search...'); // Debug log
       // Add a subtle loading indicator to the search button
       const searchBtn = document.getElementById('searchBtn');
       searchBtn.innerHTML = '<span class="icon">⏳</span>';
       
       this.searchTimeout = setTimeout(async () => {
         try {
+          console.log('Timeout triggered, searching...'); // Debug log
           // Get both suggestions and perform actual search
           const [suggestions, searchResults] = await Promise.all([
             this.searchManager.getSearchSuggestions(query),
             this.searchManager.universalSearch(query)
           ]);
           
+          console.log('Search results from handleSearchInput:', searchResults); // Debug log
           // Show full search results (this will hide suggestions automatically)
           this.showSearchResults(searchResults, false); // Show actual search results without loading indicator
           
@@ -539,13 +543,16 @@ class OmniPopup {
   }
 
   async performSearch(query) {
+    console.log('performSearch called with query:', query); // Debug log
     if (!query || query.trim().length === 0) return;
 
     try {
       this.showLoading();
       this.hideSearchSuggestions();
       
+      console.log('Calling universalSearch...');
       const results = await this.searchManager.universalSearch(query);
+      console.log('Search results received:', results);
       this.showSearchResults(results, false); // false = don't show loading since we're already showing it
       
       this.hideLoading();
@@ -556,6 +563,8 @@ class OmniPopup {
   }
 
   showSearchResults(results, showLoading = true) {
+    console.log('Showing search results:', results); // Debug log
+    
     document.getElementById('searchResults').classList.remove('hidden');
     document.getElementById('searchResults').classList.add('active');
     
@@ -568,31 +577,30 @@ class OmniPopup {
     const container = document.getElementById('searchResultsContent');
     let html = '';
 
-    if (results.total === 0) {
+    if (!results || results.total === 0) {
       html = '<div class="empty-state"><p>No results found</p></div>';
     } else {
-      if (results.openTabs.length > 0) {
+      if (results.openTabs && results.openTabs.length > 0) {
         html += this.renderSearchSection('Open Tabs', results.openTabs, 'tab');
       }
 
-      if (results.suspendedTabs.length > 0) {
+      if (results.suspendedTabs && results.suspendedTabs.length > 0) {
         html += this.renderSearchSection('Suspended Tabs', results.suspendedTabs, 'suspended');
       }
 
-      if (results.sessions.length > 0) {
+      if (results.sessions && results.sessions.length > 0) {
         html += this.renderSearchSection('Saved Sessions', results.sessions, 'session');
-      }
-
-      if (results.workspaces.length > 0) {
-        html += this.renderSearchSection('Workspaces', results.workspaces, 'workspace');
       }
     }
 
     container.innerHTML = html;
 
-    document.getElementById('clearSearch').addEventListener('click', () => {
-      this.clearSearch();
-    });
+    const clearBtn = document.getElementById('clearSearch');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        this.clearSearch();
+      });
+    }
   }
 
   renderSearchSection(title, items, type) {
@@ -633,13 +641,6 @@ class OmniPopup {
       html += items.map(item => `
         <div class="search-result-item session-search-result" data-session-id="${item.session.id}">
           <div class="item-title">${this.escapeHtml(item.session.name)}</div>
-          <div class="item-subtitle">${item.totalMatches} matching tabs</div>
-        </div>
-      `).join('');
-    } else if (type === 'workspace') {
-      html += items.map(item => `
-        <div class="search-result-item workspace-search-result" data-workspace-id="${item.workspace.id}">
-          <div class="item-title">${this.escapeHtml(item.workspace.name)}</div>
           <div class="item-subtitle">${item.totalMatches} matching tabs</div>
         </div>
       `).join('');

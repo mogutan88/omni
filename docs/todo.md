@@ -14,9 +14,9 @@
 - [x] Session recovery/restoration
 - [x] Session persistence in storage
 - [x] Auto-save functionality (basic implementation)
-- [ ] Single window session saving
-- [ ] Named session support
-- [ ] Session preservation across restarts
+- [x] Single window session saving
+- [x] Named session support
+- [x] Session persistence across extension reinstalls and updates
 - [ ] Crash recovery (automatic detection and recovery)
 
 ### Session Organization (Workspace features removed per PRD update)
@@ -56,7 +56,7 @@
 - [x] Show all tabs by default in Manager Search page when search is empty
 - [x] Added window count display to popup Dashboard and Manager Overview
 - [x] Fixed broken session saving and restoration functionality (added missing saveTabsAsSession method)
-- [x] Display correct favicons for internal chrome pages using the _favicon API
+- [x] Robust favicon handling (internal pages, fallbacks, and error handling)
 
 ### Testing & Polish
 - [ ] Complete extension testing in Chrome
@@ -175,6 +175,7 @@
 - [x] Diagnostic tools
 - [x] Test data generation
 - [x] Stable extension ID for dev via manifest `key`
+- [x] Made StorageManager service-worker-safe
 - [ ] Integration APIs
 - [ ] Plugin system
 - [ ] Webhook support
