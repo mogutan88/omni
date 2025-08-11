@@ -71,10 +71,10 @@ omni/
 ├── manifest.json
 ├── background.js
 ├── popup.html
+├── omni.html
 ├── suspended.html
 ├── src/
 │   ├── tab-manager.js
-│   ├── workspace-manager.js
 │   ├── search-manager.js
 │   └── popup.js
 ├── css/

@@ -1121,7 +1121,7 @@ class OmniPopup {
   async openManager() {
     try {
       await chrome.tabs.create({
-        url: chrome.runtime.getURL('index.html')
+        url: chrome.runtime.getURL('omni.html')
       });
       window.close();
     } catch (error) {

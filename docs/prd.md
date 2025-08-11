@@ -15,6 +15,8 @@ Omni is a comprehensive browser extension that combines the best features and fu
 - Session: Session is a status of Browser tabs and windows at a given time. Can be stored and restored preserving the previous windows and tabs status. 
 - Single window session: Session usually means the status of all tabs and windows, but can be narrowed down to a single window session meaning the status of all tabs in a window.
 - Named session: Session can exist with or without a visible/given name, and can be given a name.
+- Omni popup: Popup window shown when user clicks the extension icon in the window toolbar.
+- Omni page: Extension index page which has UIs of full features and functionalities of the Omni extension.
 
 ## Core Session Management
 

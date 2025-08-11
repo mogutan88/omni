@@ -52,6 +52,8 @@ Omni is a comprehensive browser extension that combines the best features from l
 - **Session**: The status of browser tabs and windows at a given time, which can be stored and restored
 - **Single Window Session**: A session limited to tabs within a single window
 - **Named Session**: A session with a user-assigned or automatically generated name
+- **Omni Popup**: Popup window shown when user clicks the extension icon in the window toolbar
+- **Omni Page**: Extension index page which has UIs of full features and functionalities of the Omni extension
 
 ## Browser Compatibility
 
@@ -74,6 +76,7 @@ omni/
 ├── manifest.json
 ├── background.js
 ├── popup.html
+├── omni.html
 ├── suspended.html
 ├── src/
 │   ├── tab-manager.js
