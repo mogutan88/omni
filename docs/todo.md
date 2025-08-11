@@ -56,6 +56,7 @@
 - [x] Show all tabs by default in Manager Search page when search is empty
 - [x] Added window count display to popup Dashboard and Manager Overview
 - [x] Fixed broken session saving and restoration functionality (added missing saveTabsAsSession method)
+- [x] Display correct favicons for internal chrome pages using the _favicon API
 
 ### Testing & Polish
 - [ ] Complete extension testing in Chrome

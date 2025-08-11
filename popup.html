@@ -191,15 +191,26 @@
 
                 <!-- Debug Actions -->
                 <div class="dev-section">
+                    <h3>Session Backup</h3>
+                    <div class="action-buttons">
+                        <button id="exportSessions" class="action-btn">
+                            <span class="icon">📤</span>
+                            Export Sessions
+                        </button>
+                        <button id="importSessions" class="action-btn">
+                            <span class="icon">📥</span>
+                            Import Sessions
+                        </button>
+                        <input type="file" id="importSessionsFile" accept=".json" style="display: none;">
+                    </div>
+                    <p class="dev-note">💡 Use these to backup sessions before reloading unpacked extensions</p>
+                </div>
+                <div class="dev-section">
                     <h3>Debug Actions</h3>
                     <div class="action-buttons">
                         <button id="exportData" class="action-btn">
                             <span class="icon">📤</span>
                             Export All Data
-                        </button>
-                        <button id="importData" class="action-btn">
-                            <span class="icon">📥</span>
-                            Import Data
                         </button>
                         <button id="clearStorage" class="action-btn">
                             <span class="icon">🗑️</span>

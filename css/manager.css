@@ -831,6 +831,41 @@ body {
   transform: translateX(20px);
 }
 
+/* Search window grouping styles */
+.search-window-group {
+  margin-bottom: 16px;
+}
+
+.search-window-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: #f1f3f4;
+  border-bottom: 1px solid #dadce0;
+  font-size: 12px;
+}
+
+.search-window-header h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6368;
+  margin: 0;
+}
+
+.search-tab-count {
+  font-size: 11px;
+  color: #5f6368;
+  background: #e8f0fe;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.search-tab-list {
+  padding-left: 12px;
+  border-left: 2px solid #e8f0fe;
+}
+
 /* Utility Classes */
 .hidden {
   display: none !important;

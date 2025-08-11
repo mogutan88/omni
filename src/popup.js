@@ -16,6 +16,7 @@ class OmniPopup {
       
       await this.initializeManagers();
       this.setupEventListeners();
+      this.setupMessageListeners();
       this.loadDashboard();
       this.focusSearchInput();
     } catch (error) {
@@ -29,6 +30,24 @@ class OmniPopup {
       this.tabManager.initializeTabSuspension(),
       this.searchManager.loadSearchHistory()
     ]);
+  }
+
+  setupMessageListeners() {
+    // Listen for tab count changes from background script
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'TAB_COUNT_CHANGED') {
+        // Update dashboard statistics when tab count changes
+        if (this.currentTab === 'dashboard') {
+          this.loadDashboard();
+        }
+        
+        // Update development tab statistics if visible
+        if (this.currentTab === 'development') {
+          this.updateStorageStats();
+        }
+      }
+      return true; // Keep the message channel open for async response
+    });
   }
 
   setupEventListeners() {
@@ -57,7 +76,10 @@ class OmniPopup {
 
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.addEventListener('click', (e) => {
-        this.switchTab(e.target.dataset.tab);
+        // Use currentTarget instead of target to get the button element, not potential child elements
+        const tabName = e.currentTarget.dataset.tab;
+        console.log('Nav tab clicked:', tabName);
+        this.switchTab(tabName);
       });
     });
 
@@ -134,6 +156,31 @@ class OmniPopup {
       if (sessionSearchResult) {
         const sessionId = sessionSearchResult.dataset.sessionId;
         this.restoreSession(sessionId);
+        return;
+      }
+
+      // Handle tab action buttons
+      const tabActionButton = e.target.closest('.tab-action-switch, .tab-action-restore, .tab-action-suspend, .tab-action-close');
+      if (tabActionButton) {
+        const tabId = parseInt(tabActionButton.dataset.tabId);
+        
+        if (tabActionButton.classList.contains('tab-action-switch')) {
+          this.switchToTab(tabId);
+        } else if (tabActionButton.classList.contains('tab-action-restore')) {
+          this.restoreTab(tabId);
+        } else if (tabActionButton.classList.contains('tab-action-suspend')) {
+          this.suspendTab(tabId);
+        } else if (tabActionButton.classList.contains('tab-action-close')) {
+          this.closeTab(tabId);
+        }
+        return;
+      }
+
+      // Handle suggestion items
+      const suggestionItem = e.target.closest('.suggestion-item');
+      if (suggestionItem) {
+        const suggestionText = suggestionItem.dataset.suggestionText;
+        this.selectSuggestion(suggestionText);
         return;
       }
 
@@ -288,32 +335,54 @@ class OmniPopup {
         return;
       }
 
-      container.innerHTML = tabs.map(tab => `
-        <div class="tab-item" data-tab-id="${tab.id}">
-          <img class="item-icon" src="${tab.favIconUrl || 'data:image/svg+xml,<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 16 16\\"><rect width=\\"16\\" height=\\"16\\" fill=\\"#f1f3f4\\"/></svg>'}" onerror="this.style.display='none'">
-          <div class="item-content">
-            <div class="item-title">${this.escapeHtml(tab.title)}</div>
-            <div class="item-subtitle">${this.escapeHtml(this.extractDomain(tab.url))} • Window ${tab.windowId}</div>
+      // Group tabs by window
+      const tabsByWindow = {};
+      tabs.forEach(tab => {
+        if (!tabsByWindow[tab.windowId]) {
+          tabsByWindow[tab.windowId] = [];
+        }
+        tabsByWindow[tab.windowId].push(tab);
+      });
+
+      // Render tabs grouped by window
+      container.innerHTML = Object.entries(tabsByWindow).map(([windowId, windowTabs]) => `
+        <div class="tab-group">
+          <div class="tab-group-header">
+            <h3>Window ${windowId}</h3>
+            <span class="tab-count">${windowTabs.length} tabs</span>
           </div>
-          <div class="item-actions">
-            <button class="item-action" onclick="popup.switchToTab(${tab.id})" title="Switch to tab">
-              ↗️
-            </button>
-            ${tab.suspended ? `
-              <button class="item-action" onclick="popup.restoreTab(${tab.id})" title="Restore">
-                ▶️
-              </button>
-            ` : `
-              <button class="item-action" onclick="popup.suspendTab(${tab.id})" title="Suspend">
-                ⏸️
-              </button>
-            `}
-            <button class="item-action" onclick="popup.closeTab(${tab.id})" title="Close">
-              ❌
-            </button>
+          <div class="tab-list">
+            ${windowTabs.map(tab => `
+              <div class="tab-item" data-tab-id="${tab.id}">
+                <img class="item-icon favicon-img" src="${this.getFaviconUrl(tab)}" alt="">
+                <div class="item-content">
+                  <div class="item-title">${this.escapeHtml(tab.title)}</div>
+                  <div class="item-subtitle">${this.escapeHtml(this.extractDomain(tab.url))}</div>
+                </div>
+                <div class="item-actions">
+                  <button class="item-action tab-action-switch" data-tab-id="${tab.id}" title="Switch to tab">
+                    ↗️
+                  </button>
+                  ${tab.suspended ? `
+                    <button class="item-action tab-action-restore" data-tab-id="${tab.id}" title="Restore">
+                      ▶️
+                    </button>
+                  ` : `
+                    <button class="item-action tab-action-suspend" data-tab-id="${tab.id}" title="Suspend">
+                      ⏸️
+                    </button>
+                  `}
+                  <button class="item-action tab-action-close" data-tab-id="${tab.id}" title="Close">
+                    ❌
+                  </button>
+                </div>
+              </div>
+            `).join('')}
           </div>
         </div>
       `).join('');
+
+      this.addFaviconErrorHandlers();
     } catch (error) {
       console.error('Error loading all tabs:', error);
     }
@@ -336,16 +405,33 @@ class OmniPopup {
   }
 
   switchTab(tabName) {
+    console.log('Switching to tab:', tabName);
+    
+    // Remove active class from all nav tabs
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.classList.remove('active');
     });
     
+    // Remove active class from all tab content
     document.querySelectorAll('.tab-content').forEach(content => {
       content.classList.remove('active');
     });
 
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-    document.getElementById(`${tabName}Tab`).classList.add('active');
+    // Add active class to the clicked nav tab
+    const navTab = document.querySelector(`[data-tab="${tabName}"]`);
+    if (navTab) {
+      navTab.classList.add('active');
+    } else {
+      console.error('Navigation tab not found:', tabName);
+    }
+
+    // Add active class to the corresponding content tab
+    const contentTab = document.getElementById(`${tabName}Tab`);
+    if (contentTab) {
+      contentTab.classList.add('active');
+    } else {
+      console.error('Content tab not found:', `${tabName}Tab`);
+    }
     
     this.currentTab = tabName;
 
@@ -424,7 +510,7 @@ class OmniPopup {
     }
 
     container.innerHTML = suggestions.map(suggestion => `
-      <div class="suggestion-item" onclick="popup.selectSuggestion('${suggestion.text}')">
+      <div class="suggestion-item" data-suggestion-text="${this.escapeHtml(suggestion.text)}">
         <span class="icon">${this.getSuggestionIcon(suggestion.icon)}</span>
         <span>${this.escapeHtml(suggestion.text)}</span>
       </div>
@@ -516,10 +602,31 @@ class OmniPopup {
     `;
 
     if (type === 'tab' || type === 'suspended') {
-      html += items.map(item => `
-        <div class="search-result-item clickable-tab" data-tab-id="${item.id}" data-type="${type}" style="cursor: pointer;">
-          <div class="item-title">${this.escapeHtml(item.title)}</div>
-          <div class="item-subtitle">${this.escapeHtml(this.extractDomain(item.url))} • Window ${item.windowId || 'N/A'}</div>
+      // Group tabs by window for better organization
+      const tabsByWindow = {};
+      items.forEach(item => {
+        const windowId = item.windowId || 'Unknown';
+        if (!tabsByWindow[windowId]) {
+          tabsByWindow[windowId] = [];
+        }
+        tabsByWindow[windowId].push(item);
+      });
+
+      // Render tabs grouped by window
+      html += Object.entries(tabsByWindow).map(([windowId, windowTabs]) => `
+        <div class="search-window-group">
+          <div class="search-window-header">
+            <h4>Window ${windowId}</h4>
+            <span class="search-tab-count">${windowTabs.length} tabs</span>
+          </div>
+          <div class="search-tab-list">
+            ${windowTabs.map(item => `
+              <div class="search-result-item clickable-tab" data-tab-id="${item.id}" data-type="${type}" style="cursor: pointer;">
+                <div class="item-title">${this.escapeHtml(item.title)}</div>
+                <div class="item-subtitle">${this.escapeHtml(this.extractDomain(item.url))}</div>
+              </div>
+            `).join('')}
+          </div>
         </div>
       `).join('');
     } else if (type === 'session') {
@@ -757,6 +864,26 @@ class OmniPopup {
     return div.innerHTML;
   }
 
+  getFaviconUrl(tab) {
+    // For internal Chrome pages, use the _favicon API
+    if (tab.url && (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://'))) {
+      return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(tab.url)}`;
+    }
+
+    // For web pages, prioritize the favIconUrl from the tab object
+    if (tab.favIconUrl) {
+      return tab.favIconUrl;
+    }
+
+    // As a fallback for web pages without favicons, use a default icon
+    if (tab.url && (tab.url.startsWith('http:') || tab.url.startsWith('https:'))) {
+      return 'icons/icon16.svg';
+    }
+
+    // For all other cases (e.g., file:// URLs, about:blank), use a default icon
+    return 'icons/icon16.svg';
+  }
+
   formatDate(timestamp) {
     const date = new Date(timestamp);
     const now = new Date();
@@ -771,6 +898,14 @@ class OmniPopup {
     if (diffDays < 7) return `${diffDays}d ago`;
     
     return date.toLocaleDateString();
+  }
+
+  addFaviconErrorHandlers() {
+    document.querySelectorAll('.favicon-img').forEach(img => {
+      img.addEventListener('error', () => {
+        img.src = 'icons/icon16.svg';
+      });
+    });
   }
 
   // Development Tab Methods
@@ -839,14 +974,24 @@ class OmniPopup {
       await this.updatePerformanceMetrics();
     });
 
+    // Export sessions
+    document.getElementById('exportSessions')?.addEventListener('click', () => {
+      this.exportSessions();
+    });
+
+    // Import sessions
+    document.getElementById('importSessions')?.addEventListener('click', () => {
+      document.getElementById('importSessionsFile').click();
+    });
+
+    // Handle session import file
+    document.getElementById('importSessionsFile')?.addEventListener('change', (e) => {
+      this.handleSessionImportFile(e);
+    });
+
     // Export data
     document.getElementById('exportData')?.addEventListener('click', () => {
       this.exportAllData();
-    });
-
-    // Import data
-    document.getElementById('importData')?.addEventListener('click', () => {
-      this.importData();
     });
 
     // Clear storage
@@ -940,6 +1085,38 @@ class OmniPopup {
     };
     
     input.click();
+  }
+
+  async exportSessions() {
+    try {
+      await this.storageManager.exportSessions();
+      this.logToConsole('info', 'Sessions exported successfully');
+    } catch (error) {
+      this.logToConsole('error', `Export failed: ${error.message}`);
+    }
+  }
+
+  async handleSessionImportFile(event) {
+    try {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const text = await file.text();
+      const result = await this.storageManager.importSessions(text, true); // Merge with existing
+
+      this.logToConsole('info', `Successfully imported ${result.imported} sessions`);
+      
+      // Update UI
+      await this.updateStorageStats();
+      if (this.currentTab === 'sessions') {
+        await this.loadSessions();
+      }
+      
+      // Reset the file input
+      event.target.value = '';
+    } catch (error) {
+      this.logToConsole('error', `Import failed: ${error.message}`);
+    }
   }
 
   async clearAllStorage() {

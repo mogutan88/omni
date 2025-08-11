@@ -423,11 +423,13 @@
                         <div class="settings-section">
                             <h3>Data & Privacy</h3>
                             <div class="setting-item">
-                                <button class="btn btn-secondary">Export All Data</button>
-                                <button class="btn btn-secondary">Import Data</button>
+                                <button class="btn btn-secondary" id="exportSessionsBtn">Export Sessions</button>
+                                <button class="btn btn-secondary" id="importSessionsBtn">Import Sessions</button>
+                                <input type="file" id="importFileInput" accept=".json" style="display: none;">
                             </div>
+                            <p class="setting-description">Export your sessions as a JSON file for backup. Useful when developing extensions (unpacked mode).</p>
                             <div class="setting-item">
-                                <button class="btn btn-danger">Clear All Data</button>
+                                <button class="btn btn-danger" id="clearAllDataBtn">Clear All Data</button>
                                 <p class="setting-description">This will remove all saved sessions and settings</p>
                             </div>
                         </div>

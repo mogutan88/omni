@@ -17,6 +17,7 @@ class OmniManager {
       
       await this.initializeManagers();
       this.setupEventListeners();
+      this.setupMessageListeners();
       this.loadOverview();
       this.updateSidebarBadges();
       
@@ -33,6 +34,27 @@ class OmniManager {
       this.tabManager.initializeTabSuspension(),
       this.searchManager.loadSearchHistory()
     ]);
+  }
+
+  setupMessageListeners() {
+    // Listen for tab count changes from background script
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'TAB_COUNT_CHANGED') {
+        // Update badges when tab count changes
+        this.updateSidebarBadges();
+        
+        // If we're currently viewing All Tabs, refresh the view
+        if (this.currentView === 'tabs') {
+          this.loadTabs();
+        }
+        
+        // If we're currently viewing Overview, refresh the view
+        if (this.currentView === 'overview') {
+          this.loadOverview();
+        }
+      }
+      return true; // Keep the message channel open for async response
+    });
   }
 
   setupEventListeners() {
@@ -175,6 +197,26 @@ class OmniManager {
     // Reset settings
     document.querySelector('.settings-actions .btn-secondary')?.addEventListener('click', () => {
       this.resetSettings();
+    });
+
+    // Export sessions
+    document.getElementById('exportSessionsBtn')?.addEventListener('click', () => {
+      this.exportSessions();
+    });
+
+    // Import sessions
+    document.getElementById('importSessionsBtn')?.addEventListener('click', () => {
+      document.getElementById('importFileInput').click();
+    });
+
+    // Handle file input for import
+    document.getElementById('importFileInput')?.addEventListener('change', (e) => {
+      this.handleImportFile(e);
+    });
+
+    // Clear all data
+    document.getElementById('clearAllDataBtn')?.addEventListener('click', () => {
+      this.clearAllData();
     });
   }
 
@@ -406,7 +448,7 @@ class OmniManager {
           <div class="tab-list">
             ${windowTabs.map(tab => `
               <div class="tab-item ${tab.suspended ? 'suspended' : ''}" data-tab-id="${tab.id}" data-suspended="${tab.suspended}">
-                <img class="tab-favicon" src="${tab.favIconUrl || 'data:image/svg+xml,<svg/>'}" onerror="this.style.display='none'">
+                <img class="tab-favicon favicon-img" src="${this.getFaviconUrl(tab)}" alt="">
                 <div class="tab-content">
                   <div class="tab-title">${this.escapeHtml(tab.title)}</div>
                   <div class="tab-url">${this.escapeHtml(this.extractDomain(tab.url))}</div>
@@ -433,6 +475,7 @@ class OmniManager {
           </div>
         </div>
       `).join('');
+      this.addFaviconErrorHandlers();
     } catch (error) {
       console.error('Error loading tabs:', error);
     }
@@ -501,8 +544,6 @@ class OmniManager {
   }
 
   showSessionModal(currentWindowOnly = false) {
-    console.log('Manager.showSessionModal called with currentWindowOnly:', currentWindowOnly);
-    
     document.getElementById('sessionModal').classList.remove('hidden');
     document.getElementById('modalOverlay').classList.remove('hidden');
     
@@ -510,18 +551,13 @@ class OmniManager {
     const includeAllWindows = document.getElementById('includeAllWindows');
     
     if (!nameInput || !includeAllWindows) {
-      console.error('Session modal elements not found:', { nameInput, includeAllWindows });
+      console.error('Session modal elements not found');
       return;
     }
     
     nameInput.value = `Session ${new Date().toLocaleString()}`;
     includeAllWindows.checked = !currentWindowOnly;
     nameInput.focus();
-    
-    console.log('Session modal setup complete:', {
-      sessionName: nameInput.value,
-      includeAllWindows: includeAllWindows.checked
-    });
   }
 
   closeModals() {
@@ -616,17 +652,13 @@ class OmniManager {
         ${results.openTabs.length > 0 ? `
           <div class="result-section">
             <h3>Open Tabs (${results.openTabs.length})</h3>
-            <div class="tab-list">
-              ${results.openTabs.map(tab => this.renderTabItem(tab, false)).join('')}
-            </div>
+            ${this.renderTabsGroupedByWindow(results.openTabs, false)}
           </div>
         ` : ''}
         ${results.suspendedTabs.length > 0 ? `
           <div class="result-section">
             <h3>Suspended Tabs (${results.suspendedTabs.length})</h3>
-            <div class="tab-list">
-              ${results.suspendedTabs.map(tab => this.renderTabItem(tab, true)).join('')}
-            </div>
+            ${this.renderTabsGroupedByWindow(results.suspendedTabs, true)}
           </div>
         ` : ''}
         ${results.sessions.length > 0 ? `
@@ -649,16 +681,15 @@ class OmniManager {
           </div>
         ` : ''}
       `;
+      this.addFaviconErrorHandlers();
     } catch (error) {
       console.error('Error performing search:', error);
     }
   }
 
   async restoreSession(sessionId) {
-    console.log('Manager.restoreSession called with sessionId:', sessionId);
     try {
       await this.tabManager.restoreTabsFromSession(sessionId);
-      console.log('Session restored successfully');
       this.showToast('Session restored', 'success');
     } catch (error) {
       console.error('Error restoring session:', error);
@@ -667,15 +698,10 @@ class OmniManager {
   }
 
   async deleteSession(sessionId) {
-    console.log('Manager.deleteSession called with sessionId:', sessionId);
-    if (!confirm('Delete this session?')) {
-      console.log('Session deletion cancelled by user');
-      return;
-    }
+    if (!confirm('Delete this session?')) return;
 
     try {
       await this.storageManager.removeSession(sessionId);
-      console.log('Session deleted successfully');
       
       this.showToast('Session deleted', 'success');
       await this.loadSessions();
@@ -747,23 +773,16 @@ class OmniManager {
     const name = document.getElementById('sessionName').value.trim() || `Session ${Date.now()}`;
     const includeAllWindows = document.getElementById('includeAllWindows').checked;
 
-    console.log('Manager.saveSession called:', { name, includeAllWindows });
-
     try {
       let tabs;
       if (includeAllWindows) {
-        console.log('Getting all tabs from all windows');
         tabs = await this.tabManager.getAllTabs();
       } else {
-        console.log('Getting tabs from current window only');
         // Get only current window tabs
         const currentWindow = await chrome.windows.getCurrent();
-        console.log('Current window ID:', currentWindow.id);
         const allTabs = await this.tabManager.getAllTabs();
         tabs = allTabs.filter(tab => tab.windowId === currentWindow.id);
       }
-      
-      console.log('Tabs to save:', tabs.length);
       
       const tabsData = tabs.map(tab => ({
         id: tab.id,
@@ -775,10 +794,8 @@ class OmniManager {
         saved: Date.now()
       }));
 
-      console.log('Calling tabManager.saveTabsAsSession with:', tabsData.length, 'tabs');
       await this.tabManager.saveTabsAsSession(name, tabsData);
       
-      console.log('Session saved successfully, closing modals');
       this.closeModals();
       this.showToast('Session saved successfully', 'success');
       
@@ -819,6 +836,66 @@ class OmniManager {
     } catch (error) {
       console.error('Error exporting data:', error);
       this.showToast('Export failed', 'error');
+    }
+  }
+
+  async exportSessions() {
+    try {
+      await this.storageManager.exportSessions();
+      this.showToast('Sessions exported successfully', 'success');
+    } catch (error) {
+      console.error('Error exporting sessions:', error);
+      this.showToast('Failed to export sessions: ' + error.message, 'error');
+    }
+  }
+
+  async handleImportFile(event) {
+    try {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const text = await file.text();
+      const result = await this.storageManager.importSessions(text, true); // Merge with existing
+
+      this.showToast(`Successfully imported ${result.imported} sessions`, 'success');
+      
+      // Refresh current view if it's sessions
+      if (this.currentView === 'sessions') {
+        await this.loadSessions();
+      }
+      
+      await this.updateSidebarBadges();
+      
+      // Reset the file input
+      event.target.value = '';
+    } catch (error) {
+      console.error('Error importing sessions:', error);
+      this.showToast('Failed to import sessions: ' + error.message, 'error');
+    }
+  }
+
+  async clearAllData() {
+    if (!confirm('⚠️ This will permanently delete ALL saved sessions and settings. Are you sure?')) {
+      return;
+    }
+
+    if (!confirm('🚨 FINAL WARNING: This action cannot be undone. All your sessions will be lost forever. Continue?')) {
+      return;
+    }
+
+    try {
+      // Clear all storage
+      await chrome.storage.local.clear();
+      await chrome.storage.sync.clear();
+      
+      this.showToast('All data cleared successfully', 'success');
+      
+      // Refresh all views
+      await this.refreshCurrentView();
+      await this.updateSidebarBadges();
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      this.showToast('Failed to clear data: ' + error.message, 'error');
     }
   }
 
@@ -953,7 +1030,7 @@ class OmniManager {
   renderTabItem(tab, isSuspended = false) {
     return `
       <div class="tab-item ${isSuspended ? 'suspended' : ''}" data-tab-id="${tab.id}" data-suspended="${isSuspended}">
-        <img class="tab-favicon" src="${tab.favIconUrl || 'data:image/svg+xml,<svg/>'}" onerror="this.style.display='none'">
+        <img class="tab-favicon favicon-img" src="${this.getFaviconUrl(tab)}" alt="">
         <div class="tab-content">
           <div class="tab-title">${this.escapeHtml(tab.title)}</div>
           <div class="tab-url">${this.escapeHtml(this.extractDomain(tab.url))}</div>
@@ -979,6 +1056,31 @@ class OmniManager {
     `;
   }
 
+  renderTabsGroupedByWindow(tabs, isSuspended = false) {
+    // Group tabs by window
+    const tabsByWindow = {};
+    tabs.forEach(tab => {
+      const windowId = tab.windowId || 'Unknown';
+      if (!tabsByWindow[windowId]) {
+        tabsByWindow[windowId] = [];
+      }
+      tabsByWindow[windowId].push(tab);
+    });
+
+    // Render tabs grouped by window
+    return Object.entries(tabsByWindow).map(([windowId, windowTabs]) => `
+      <div class="search-window-group">
+        <div class="search-window-header">
+          <h4>Window ${windowId}</h4>
+          <span class="search-tab-count">${windowTabs.length} tabs</span>
+        </div>
+        <div class="search-tab-list">
+          ${windowTabs.map(tab => this.renderTabItem(tab, isSuspended)).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
   extractDomain(url) {
     try {
       return new URL(url).hostname.replace('www.', '');
@@ -991,6 +1093,26 @@ class OmniManager {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  getFaviconUrl(tab) {
+    // For internal Chrome pages, use the _favicon API
+    if (tab.url && (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://'))) {
+      return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(tab.url)}`;
+    }
+
+    // For web pages, prioritize the favIconUrl from the tab object
+    if (tab.favIconUrl) {
+      return tab.favIconUrl;
+    }
+
+    // As a fallback for web pages without favicons, use a default icon
+    if (tab.url && (tab.url.startsWith('http:') || tab.url.startsWith('https:'))) {
+      return 'icons/icon16.svg';
+    }
+
+    // For all other cases (e.g., file:// URLs, about:blank), use a default icon
+    return 'icons/icon16.svg';
   }
 
   formatDate(timestamp) {
@@ -1007,6 +1129,14 @@ class OmniManager {
     if (diffDays < 7) return `${diffDays}d ago`;
     
     return date.toLocaleDateString();
+  }
+
+  addFaviconErrorHandlers() {
+    document.querySelectorAll('.favicon-img').forEach(img => {
+      img.addEventListener('error', () => {
+        img.src = 'icons/icon16.svg';
+      });
+    });
   }
 }
 

@@ -1,145 +1,47 @@
+importScripts('src/storage-manager.js');
+
 class OmniBackground {
   constructor() {
+    this.storageManager = new StorageManager();
+    this.lastNotificationTime = 0;
+    this.notificationThrottle = 500; // 500ms throttle
     this.initializeEventListeners();
   }
 
   initializeEventListeners() {
-    chrome.runtime.onInstalled.addListener(() => {
-      this.initializeStorage();
-    });
-
     chrome.commands.onCommand.addListener((command) => {
       this.handleCommand(command);
     });
 
-    chrome.tabs.onRemoved.addListener((tabId) => {
+    // Tab lifecycle events
+    chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
       this.handleTabRemoved(tabId);
+      this.notifyTabCountChanged();
+    });
+
+    chrome.tabs.onCreated.addListener((tab) => {
+      this.notifyTabCountChanged();
     });
 
     chrome.windows.onRemoved.addListener((windowId) => {
       this.handleWindowRemoved(windowId);
+      this.notifyTabCountChanged();
+    });
+
+    chrome.windows.onCreated.addListener((window) => {
+      this.notifyTabCountChanged();
     });
   }
 
-  async initializeStorage() {
-    const defaultData = {
-      sessions: [],
-      workspaces: [{
-        id: 'default',
-        name: 'Default Workspace',
-        tabs: [],
-        created: Date.now(),
-        lastAccessed: Date.now()
-      }],
-      suspendedTabs: [],
-      settings: {
-        autoSave: true,
-        suspendInactive: true,
-        suspendTimeoutMinutes: 30
-      }
-    };
-
-    const existing = await chrome.storage.local.get();
-    if (Object.keys(existing).length === 0) {
-      await chrome.storage.local.set(defaultData);
-    }
-  }
-
-  async handleCommand(command) {
-    switch (command) {
-      case 'convert-all-tabs':
-        await this.convertAllTabs();
-        break;
-      case 'open-popup':
-        chrome.action.openPopup();
-        break;
-    }
-  }
-
-  async convertAllTabs() {
-    try {
-      const windows = await chrome.windows.getAll({ populate: true });
-      const allTabs = [];
-      
-      for (const window of windows) {
-        for (const tab of window.tabs) {
-          if (!tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
-            allTabs.push({
-              id: tab.id,
-              url: tab.url,
-              title: tab.title,
-              favIconUrl: tab.favIconUrl,
-              windowId: window.id,
-              index: tab.index,
-              saved: Date.now()
-            });
-            
-            await chrome.tabs.remove(tab.id);
-          }
-        }
-      }
-
-      if (allTabs.length > 0) {
-        await this.saveSession('Converted Session', allTabs);
-        
-        chrome.tabs.create({
-          url: chrome.runtime.getURL('popup.html')
-        });
-      }
-    } catch (error) {
-      console.error('Error converting tabs:', error);
-    }
-  }
-
   async saveSession(name, tabs) {
-    try {
-      // Try sync storage with fallback to local
-      const data = await chrome.storage.sync.get(['sessions']);
-      const sessions = data.sessions || [];
-      
-      const session = {
-        id: Date.now().toString(),
-        name: name || `Session ${sessions.length + 1}`,
-        tabs: tabs,
-        created: Date.now(),
-        tabCount: tabs.length
-      };
-      
-      sessions.unshift(session);
-      
-      // Limit to 20 sessions for sync storage
-      if (sessions.length > 20) {
-        sessions.splice(20);
-      }
-      
-      await chrome.storage.sync.set({ sessions });
-      // Also backup to local storage
-      await chrome.storage.local.set({ sessions_backup: sessions });
-      
-      return session;
-    } catch (error) {
-      console.warn('Sync storage failed, using local storage:', error);
-      
-      // Fallback to local storage
-      const data = await chrome.storage.local.get(['sessions_backup']);
-      const sessions = data.sessions_backup || [];
-      
-      const session = {
-        id: Date.now().toString(),
-        name: name || `Session ${sessions.length + 1}`,
-        tabs: tabs,
-        created: Date.now(),
-        tabCount: tabs.length
-      };
-      
-      sessions.unshift(session);
-      if (sessions.length > 20) {
-        sessions.splice(20);
-      }
-      
-      await chrome.storage.local.set({ sessions_backup: sessions });
-      return session;
-    }
+    const session = {
+      id: Date.now().toString(),
+      name: name || `Session ${new Date().toLocaleString()}`,
+      tabs: tabs,
+      created: Date.now(),
+      tabCount: tabs.length
+    };
+    return await this.storageManager.addSession(session);
   }
 
   async handleTabRemoved(tabId) {
@@ -159,6 +61,96 @@ class OmniBackground {
     const updatedTabs = suspendedTabs.filter(tab => tab.windowId !== windowId);
     if (updatedTabs.length !== suspendedTabs.length) {
       await chrome.storage.local.set({ suspendedTabs: updatedTabs });
+    }
+  }
+
+  // Check if a tab URL represents a user-visible tab that should be counted
+  isUserTab(url) {
+    if (!url) return false;
+    
+    // Allow regular web pages (http/https)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return true;
+    }
+    
+    // Allow Chrome internal pages (settings, extensions, etc.) - users can see and interact with these
+    if (url.startsWith('chrome://')) {
+      return true;
+    }
+    
+    // Allow blank tabs
+    if (url === 'about:blank') {
+      return true;
+    }
+    
+    // Allow file URLs
+    if (url.startsWith('file://')) {
+      return true;
+    }
+    
+    // Allow extension pages - users can see these (options pages, popups, etc.)
+    if (url.startsWith('chrome-extension://')) {
+      return true;
+    }
+    
+    // Allow other protocols (ftp, data, etc.)
+    return true;
+  }
+
+  // Check if a tab can be converted (saved and closed)
+  canConvertTab(url) {
+    if (!url) return false;
+    
+    // Allow regular web pages (http/https) - these can be meaningfully saved
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return true;
+    }
+    
+    // Allow file URLs - these can be meaningfully saved
+    if (url.startsWith('file://')) {
+      return true;
+    }
+    
+    // Don't convert Chrome internal pages - not meaningful to save chrome://settings etc.
+    if (url.startsWith('chrome://')) {
+      return false;
+    }
+    
+    // Don't convert extension pages
+    if (url.startsWith('chrome-extension://')) {
+      return false;
+    }
+    
+    // Don't convert blank tabs - nothing meaningful to save
+    if (url === 'about:blank') {
+      return false;
+    }
+    
+    // Allow other protocols that can be converted (ftp, etc.)
+    return true;
+  }
+
+  // Notify manager page about tab count changes (with throttling)
+  async notifyTabCountChanged() {
+    const now = Date.now();
+    
+    // Throttle notifications to avoid spam
+    if (now - this.lastNotificationTime < this.notificationThrottle) {
+      return;
+    }
+    
+    this.lastNotificationTime = now;
+    
+    try {
+      // Send message to all extension pages
+      chrome.runtime.sendMessage({
+        type: 'TAB_COUNT_CHANGED',
+        timestamp: now
+      }).catch(() => {
+        // Ignore errors if no listeners are active
+      });
+    } catch (error) {
+      // Ignore messaging errors when no listeners
     }
   }
 }

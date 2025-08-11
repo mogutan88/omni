@@ -29,7 +29,9 @@ class TabManager {
     
     for (const window of windows) {
       for (const tab of window.tabs) {
-        if (!tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+        // Include regular web pages, new tab pages, and blank tabs
+        // Exclude only internal Chrome settings/extension pages
+        if (this.isUserTab(tab.url)) {
           allTabs.push({
             ...tab,
             windowId: window.id,
@@ -40,6 +42,72 @@ class TabManager {
     }
     
     return allTabs;
+  }
+
+  // Check if a tab URL represents a user-visible tab that should be counted
+  isUserTab(url) {
+    if (!url) return false;
+    
+    // Allow regular web pages (http/https)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return true;
+    }
+    
+    // Allow Chrome internal pages (settings, extensions, etc.) - users can see and interact with these
+    if (url.startsWith('chrome://')) {
+      return true;
+    }
+    
+    // Allow blank tabs
+    if (url === 'about:blank') {
+      return true;
+    }
+    
+    // Allow file URLs
+    if (url.startsWith('file://')) {
+      return true;
+    }
+    
+    // Allow extension pages - users can see these (options pages, popups, etc.)
+    if (url.startsWith('chrome-extension://')) {
+      return true;
+    }
+    
+    // Allow other protocols (ftp, data, etc.)
+    return true;
+  }
+
+  // Check if a tab can be suspended (more restrictive than isUserTab)
+  canSuspendTab(url) {
+    if (!url) return false;
+    
+    // Allow regular web pages (http/https) - these can be suspended
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return true;
+    }
+    
+    // Allow file URLs - these can be suspended
+    if (url.startsWith('file://')) {
+      return true;
+    }
+    
+    // Don't suspend Chrome internal pages - they can't be properly suspended
+    if (url.startsWith('chrome://')) {
+      return false;
+    }
+    
+    // Don't suspend extension pages
+    if (url.startsWith('chrome-extension://')) {
+      return false;
+    }
+    
+    // Don't suspend blank tabs - nothing meaningful to suspend
+    if (url === 'about:blank') {
+      return false;
+    }
+    
+    // Allow other protocols that can be suspended (ftp, data, etc.)
+    return true;
   }
 
   async convertAllTabs() {
@@ -78,7 +146,9 @@ class TabManager {
     try {
       const tab = await chrome.tabs.get(tabId);
       
-      if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+      // Don't suspend tabs that can't be suspended (Chrome internal pages)
+      // But allow suspending new tab pages and blank tabs
+      if (!this.canSuspendTab(tab.url)) {
         return false;
       }
 
@@ -125,7 +195,6 @@ class TabManager {
   }
 
   async saveTabsAsSession(sessionName, tabsData) {
-    console.log('TabManager.saveTabsAsSession called:', { sessionName, tabCount: tabsData.length });
     try {
       const session = {
         id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -136,19 +205,10 @@ class TabManager {
         lastAccessed: Date.now()
       };
 
-      console.log('Created session object:', {
-        id: session.id,
-        name: session.name,
-        tabCount: session.tabCount,
-        sessionSize: new Blob([JSON.stringify(session)]).size + ' bytes'
-      });
-
       // Use StorageManager for persistent session storage
-      const result = await this.storageManager.addSession(session);
-      console.log('TabManager.saveTabsAsSession completed successfully');
-      return result;
+      return await this.storageManager.addSession(session);
     } catch (error) {
-      console.error('Error in TabManager.saveTabsAsSession:', error);
+      console.error('Error saving session:', error);
       throw error;
     }
   }
@@ -202,8 +262,7 @@ class TabManager {
         
         for (const tab of tabs) {
           if (tab.id !== activeTabId && 
-              !tab.url.startsWith('chrome://') && 
-              !tab.url.startsWith('chrome-extension://') &&
+              this.canSuspendTab(tab.url) &&
               !this.suspendedTabs.has(tab.id)) {
             
             const lastAccessed = await this.getTabLastAccessed(tab.id);
