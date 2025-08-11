@@ -949,3 +949,199 @@ body {
   font-weight: 600;
   color: var(--text-primary);
 }
+
+/* Tab Item Styles */
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid var(--border-color);
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.tab-item:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tab-item.suspended {
+  opacity: 0.6;
+  background: #f8f9fa;
+}
+
+.tab-favicon {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  max-width: 16px;
+  max-height: 16px;
+  object-fit: contain;
+  border-radius: 2px;
+  background: white;
+  display: block;
+}
+
+.tab-favicon[style*="display: none"] {
+  display: none !important;
+}
+
+.tab-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tab-title {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.tab-url {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.tab-item:hover .tab-actions {
+  opacity: 1;
+}
+
+.tab-action {
+  padding: 4px 8px;
+  border: none;
+  background: var(--secondary-color);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.tab-action:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* Prevent action buttons from triggering tab item clicks */
+.tab-actions {
+  position: relative;
+  z-index: 10;
+}
+
+.tab-actions button {
+  position: relative;
+  z-index: 11;
+}
+
+/* Search Header Styling */
+.search-header {
+  margin-bottom: 24px;
+}
+
+.search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px;
+  background: var(--secondary-color);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.filter-checkbox input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Search Results Styling */
+.search-result-count {
+  background: var(--secondary-color);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.result-section {
+  margin-bottom: 24px;
+}
+
+.result-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.result-section .tab-list {
+  gap: 8px;
+}
+
+/* Session and Workspace Items in Search Results */
+.session-item,
+.workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid var(--border-color);
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.session-item:hover,
+.workspace-item:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.session-item .item-icon {
+  font-size: 18px;
+  min-width: 24px;
+  text-align: center;
+}
+
+.workspace-color {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}

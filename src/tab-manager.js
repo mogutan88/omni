@@ -1,6 +1,7 @@
 class TabManager {
   constructor() {
     this.suspendedTabs = new Map();
+    this.storageManager = new StorageManager();
     this.initializeTabSuspension();
   }
 
@@ -13,6 +14,9 @@ class TabManager {
         this.suspendedTabs.set(tab.id, tab);
       });
     }
+
+    // Migrate any existing local sessions to sync storage
+    await this.storageManager.migrateLocalSessions();
 
     if (this.settings.suspendInactive) {
       this.startInactiveTabSuspension();
@@ -120,10 +124,38 @@ class TabManager {
     }
   }
 
+  async saveTabsAsSession(sessionName, tabsData) {
+    console.log('TabManager.saveTabsAsSession called:', { sessionName, tabCount: tabsData.length });
+    try {
+      const session = {
+        id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: sessionName,
+        tabs: tabsData,
+        tabCount: tabsData.length,
+        created: Date.now(),
+        lastAccessed: Date.now()
+      };
+
+      console.log('Created session object:', {
+        id: session.id,
+        name: session.name,
+        tabCount: session.tabCount,
+        sessionSize: new Blob([JSON.stringify(session)]).size + ' bytes'
+      });
+
+      // Use StorageManager for persistent session storage
+      const result = await this.storageManager.addSession(session);
+      console.log('TabManager.saveTabsAsSession completed successfully');
+      return result;
+    } catch (error) {
+      console.error('Error in TabManager.saveTabsAsSession:', error);
+      throw error;
+    }
+  }
+
   async restoreTabsFromSession(sessionId, selectedTabs = null) {
     try {
-      const data = await chrome.storage.local.get(['sessions']);
-      const sessions = data.sessions || [];
+      const sessions = await this.storageManager.getSessions();
       const session = sessions.find(s => s.id === sessionId);
       
       if (!session) {
@@ -153,27 +185,6 @@ class TabManager {
     }
   }
 
-  async saveTabsAsSession(name, tabs) {
-    const data = await chrome.storage.local.get(['sessions']);
-    const sessions = data.sessions || [];
-    
-    const session = {
-      id: Date.now().toString(),
-      name: name || `Session ${sessions.length + 1}`,
-      tabs: tabs,
-      created: Date.now(),
-      tabCount: tabs.length
-    };
-    
-    sessions.unshift(session);
-    
-    if (sessions.length > 50) {
-      sessions.splice(50);
-    }
-    
-    await chrome.storage.local.set({ sessions });
-    return session;
-  }
 
   async saveSuspendedTabs() {
     const suspendedTabs = Array.from(this.suspendedTabs.values());
@@ -215,8 +226,7 @@ class TabManager {
 
   async searchTabs(query) {
     const allTabs = await this.getAllTabs();
-    const data = await chrome.storage.local.get(['sessions']);
-    const sessions = data.sessions || [];
+    const sessions = await this.storageManager.getSessions();
     
     const results = {
       openTabs: [],

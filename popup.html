@@ -32,7 +32,7 @@
         <!-- Search Bar -->
         <div class="search-section">
             <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Search tabs, sessions, workspaces..." class="search-input">
+                <input type="text" id="searchInput" placeholder="Search tabs and sessions..." class="search-input" autofocus>
                 <button id="searchBtn" class="search-btn">
                     <span class="icon">🔍</span>
                 </button>
@@ -45,10 +45,6 @@
             <button class="nav-tab active" data-tab="dashboard">
                 <span class="icon">📊</span>
                 Dashboard
-            </button>
-            <button class="nav-tab" data-tab="workspaces">
-                <span class="icon">🗂️</span>
-                Workspaces
             </button>
             <button class="nav-tab" data-tab="sessions">
                 <span class="icon">💾</span>
@@ -74,12 +70,12 @@
                         <div class="stat-label">Open Tabs</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="sessionsCount">0</div>
-                        <div class="stat-label">Saved Sessions</div>
+                        <div class="stat-number" id="windowsCount">0</div>
+                        <div class="stat-label">Windows</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number" id="workspacesCount">0</div>
-                        <div class="stat-label">Workspaces</div>
+                        <div class="stat-number" id="sessionsCount">0</div>
+                        <div class="stat-label">Saved Sessions</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="suspendedTabsCount">0</div>
@@ -94,9 +90,9 @@
                             <span class="icon">💾</span>
                             Save Current Session
                         </button>
-                        <button id="createWorkspace" class="action-btn">
-                            <span class="icon">➕</span>
-                            New Workspace
+                        <button id="saveCurrentWindow" class="action-btn">
+                            <span class="icon">🪟</span>
+                            Save Current Window
                         </button>
                         <button id="suspendInactiveTabs" class="action-btn">
                             <span class="icon">😴</span>
@@ -109,18 +105,6 @@
                     <h3>Recent Sessions</h3>
                     <div id="recentSessions" class="recent-list"></div>
                 </div>
-            </section>
-
-            <!-- Workspaces Tab -->
-            <section id="workspacesTab" class="tab-content">
-                <div class="section-header">
-                    <h2>Workspaces</h2>
-                    <button id="newWorkspaceBtn" class="btn btn-primary">
-                        <span class="icon">➕</span>
-                        New Workspace
-                    </button>
-                </div>
-                <div id="workspacesList" class="workspaces-list"></div>
             </section>
 
             <!-- Sessions Tab -->
@@ -272,7 +256,6 @@
                     <div class="data-viewer-controls">
                         <select id="dataType" class="select">
                             <option value="sessions">Sessions</option>
-                            <option value="workspaces">Workspaces</option>
                             <option value="suspendedTabs">Suspended Tabs</option>
                             <option value="settings">Settings</option>
                             <option value="searchHistory">Search History</option>
@@ -309,38 +292,6 @@
     </div>
 
     <!-- Modals -->
-    <div id="workspaceModal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="workspaceModalTitle">Create Workspace</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="workspaceName">Workspace Name</label>
-                    <input type="text" id="workspaceName" placeholder="Enter workspace name">
-                </div>
-                <div class="form-group">
-                    <label for="workspaceColor">Color</label>
-                    <div class="color-picker">
-                        <input type="color" id="workspaceColor" value="#4285f4">
-                        <div class="color-presets">
-                            <button class="color-preset" data-color="#4285f4" style="background: #4285f4"></button>
-                            <button class="color-preset" data-color="#ea4335" style="background: #ea4335"></button>
-                            <button class="color-preset" data-color="#34a853" style="background: #34a853"></button>
-                            <button class="color-preset" data-color="#fbbc05" style="background: #fbbc05"></button>
-                            <button class="color-preset" data-color="#9c27b0" style="background: #9c27b0"></button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="cancelWorkspace" class="btn btn-secondary">Cancel</button>
-                <button id="saveWorkspace" class="btn btn-primary">Save</button>
-            </div>
-        </div>
-    </div>
-
     <div id="sessionModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
@@ -372,8 +323,8 @@
     </div>
 
     <!-- Scripts -->
+    <script src="src/storage-manager.js"></script>
     <script src="src/tab-manager.js"></script>
-    <script src="src/workspace-manager.js"></script>
     <script src="src/search-manager.js"></script>
     <script src="src/popup.js"></script>
 </body>

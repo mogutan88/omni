@@ -1,6 +1,6 @@
 # Omni Extension - Todo List
 
-## Phase 1 (MVP) - Status: ✅ COMPLETED
+## Phase 1 (MVP) - Status: 🧪 TESTING NEEDED
 
 ### Core Tab Management
 - [x] One-click tab conversion to organized list
@@ -9,28 +9,31 @@
 - [x] Tab suspension/restoration functionality
 - [x] Cross-window tab management
 
-### Session & Collection Management
-- [x] Basic session saving
+### Session Management
+- [x] Basic session saving (all windows/tabs)
 - [x] Session recovery/restoration
 - [x] Session persistence in storage
 - [x] Auto-save functionality (basic implementation)
+- [ ] Single window session saving
+- [ ] Named session support
+- [ ] Session preservation across restarts
 - [ ] Crash recovery (automatic detection and recovery)
 
-### Workspace Organization
-- [x] Create and manage workspaces
-- [x] Switch between workspaces
-- [x] Default workspace setup
-- [x] Workspace color coding
-- [x] Save tabs to specific workspaces
+### Session Organization (Workspace features removed per PRD update)
+- [ ] Named session management (sessions with custom names)
+- [ ] Single window session saving capability
+- [ ] Session grouping by window
+- [ ] Session timestamps and metadata
 
 ### Universal Search
 - [x] Search across open tabs
 - [x] Search saved sessions
-- [x] Search workspaces
 - [x] Search suggestions
 - [x] Search history
 - [x] Fuzzy search with relevance scoring
 - [x] Real-time search results while typing (popup)
+- [x] Auto-focus search input when popup opens
+- [x] Search result click navigation to switch tabs and focus windows
 
 ### UI/UX Implementation
 - [x] Popup interface with multiple tabs
@@ -40,10 +43,19 @@
 - [x] Visual indicators for tab states
 - [x] Keyboard shortcuts (Ctrl+Shift+O, Ctrl+Shift+T)
 - [x] Development tab with debugging tools
-- [x] Full-screen manager page (index.html) with Workona-style interface
+- [x] Full-screen manager page (index.html) with comprehensive interface
 - [x] Sidebar navigation with multiple views
 - [x] Statistics dashboard with activity feed
 - [x] Toast notification system
+- [x] Window ID display in tab listings and search results
+- [x] Consistent favicon sizing and tab item styling in Manager page
+- [x] Tab item click functionality to focus tabs in Manager page
+- [x] Fixed CSP violation by replacing inline onclick handlers with event delegation
+- [x] Consistent search results styling in Manager page to match All Tabs view
+- [x] Removed redundant search box in Manager Search page while keeping filters functional
+- [x] Show all tabs by default in Manager Search page when search is empty
+- [x] Added window count display to popup Dashboard and Manager Overview
+- [x] Fixed broken session saving and restoration functionality (added missing saveTabsAsSession method)
 
 ### Testing & Polish
 - [ ] Complete extension testing in Chrome
@@ -81,7 +93,7 @@
 - [ ] Chrome sync API integration
 - [ ] Sync settings across devices
 - [ ] Sync sessions across devices
-- [ ] Sync workspaces across devices
+- [ ] Sync session groups across devices
 - [ ] Conflict resolution for sync
 
 ### Additional Enhancements
@@ -95,7 +107,7 @@
 
 ### Collaboration Features
 - [ ] Share sessions as web pages
-- [ ] Team workspaces
+- [ ] Team session sharing
 - [ ] Permission management
 - [ ] Real-time collaboration
 - [ ] Shared collections
@@ -203,11 +215,16 @@
 ## Progress Summary
 
 ### Completed ✅
-- All Phase 1 MVP features (except crash recovery)
-- Basic extension structure
-- Core functionality implementation
+- Core tab management features
+- Basic session functionality
+- Universal search implementation
 - UI/UX foundation
 - Documentation framework
+
+### Needs Update 🔧
+- Remove workspace-related features from codebase
+- Update UI to remove workspace references
+- Enhance session management per new PRD requirements
 
 ### In Progress 🔄
 - Extension testing

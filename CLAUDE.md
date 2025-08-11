@@ -95,6 +95,46 @@ omni/
 - Write clear, self-documenting code
 - Follow Chrome extension best practices
 
+### Content Security Policy (CSP) Requirements:
+**CRITICAL**: Chrome extensions have strict CSP that prevents inline JavaScript execution.
+
+**Never Use:**
+- Inline event handlers: `onclick="function()"`, `onload="function()"`, etc.
+- Inline JavaScript in HTML: `<script>code here</script>`
+- `javascript:` URLs in href attributes
+- `eval()` or similar dynamic code execution
+
+**Always Use Instead:**
+- Event delegation with `addEventListener()` in separate JS files
+- Data attributes for passing data: `data-session-id="123"`
+- CSS classes for identifying elements: `class="session-restore-btn"`
+- External script files with proper event delegation patterns
+
+**Event Delegation Pattern:**
+```javascript
+// ✅ CORRECT: Event delegation in separate JS file
+document.addEventListener('click', (e) => {
+  const restoreBtn = e.target.closest('.session-restore-btn');
+  if (restoreBtn) {
+    const sessionId = restoreBtn.dataset.sessionId;
+    this.restoreSession(sessionId);
+    return;
+  }
+});
+
+// ❌ WRONG: Inline handler (will cause CSP violation)
+<button onclick="manager.restoreSession('123')">Restore</button>
+
+// ✅ CORRECT: Use data attributes instead
+<button class="session-restore-btn" data-session-id="123">Restore</button>
+```
+
+**Testing CSP Compliance:**
+- Load extension as unpacked extension in Chrome
+- Open DevTools Console when testing
+- Look for CSP violation errors
+- All CSP errors must be fixed before release
+
 ### Testing:
 - Test all functionality in Chrome browser
 - Verify permissions and manifest configuration

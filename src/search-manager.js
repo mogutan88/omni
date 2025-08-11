@@ -1,7 +1,7 @@
 class SearchManager {
   constructor(tabManager, workspaceManager) {
     this.tabManager = tabManager;
-    this.workspaceManager = workspaceManager;
+    this.storageManager = new StorageManager();
     this.searchHistory = [];
     this.maxHistoryItems = 50;
   }
@@ -19,7 +19,6 @@ class SearchManager {
       timestamp: Date.now(),
       openTabs: [],
       sessions: [],
-      workspaces: [],
       suspendedTabs: [],
       total: 0
     };
@@ -34,26 +33,21 @@ class SearchManager {
       searchPromises.push(this.searchSessions(searchQuery));
     }
 
-    if (!options.excludeWorkspaces) {
-      searchPromises.push(this.searchWorkspaces(searchQuery));
-    }
 
     if (!options.excludeSuspended) {
       searchPromises.push(this.searchSuspendedTabs(searchQuery));
     }
 
     try {
-      const [openTabResults, sessionResults, workspaceResults, suspendedResults] = 
+      const [openTabResults, sessionResults, suspendedResults] = 
         await Promise.all(searchPromises);
 
       results.openTabs = openTabResults || [];
       results.sessions = sessionResults || [];
-      results.workspaces = workspaceResults || [];
       results.suspendedTabs = suspendedResults || [];
 
       results.total = results.openTabs.length + 
                      results.sessions.reduce((sum, s) => sum + s.tabs.length, 0) +
-                     results.workspaces.reduce((sum, w) => sum + w.tabs.length, 0) +
                      results.suspendedTabs.length;
 
       return results;
@@ -75,8 +69,7 @@ class SearchManager {
 
   async searchSessions(query) {
     try {
-      const data = await chrome.storage.local.get(['sessions']);
-      const sessions = data.sessions || [];
+      const sessions = await this.storageManager.getSessions();
       const results = [];
 
       for (const session of sessions) {
@@ -98,34 +91,6 @@ class SearchManager {
       return results.sort((a, b) => b.totalMatches - a.totalMatches);
     } catch (error) {
       console.error('Error searching sessions:', error);
-      return [];
-    }
-  }
-
-  async searchWorkspaces(query) {
-    try {
-      const allWorkspaces = this.workspaceManager.getAllWorkspaces();
-      const results = [];
-
-      for (const workspace of allWorkspaces) {
-        const matchingTabs = this.filterTabs(workspace.tabs, query);
-        const workspaceNameMatch = workspace.name.toLowerCase().includes(query);
-
-        if (matchingTabs.length > 0 || workspaceNameMatch) {
-          results.push({
-            workspace: {
-              ...workspace,
-              nameMatch: workspaceNameMatch
-            },
-            tabs: matchingTabs,
-            totalMatches: matchingTabs.length
-          });
-        }
-      }
-
-      return results.sort((a, b) => b.totalMatches - a.totalMatches);
-    } catch (error) {
-      console.error('Error searching workspaces:', error);
       return [];
     }
   }
@@ -254,8 +219,7 @@ class SearchManager {
     })));
 
     try {
-      const data = await chrome.storage.local.get(['sessions']);
-      const sessions = data.sessions || [];
+      const sessions = await this.storageManager.getSessions();
       
       const sessionSuggestions = sessions
         .filter(session => session.name.toLowerCase().includes(query))
@@ -269,18 +233,6 @@ class SearchManager {
 
       suggestions.push(...sessionSuggestions);
 
-      const workspaces = this.workspaceManager.getAllWorkspaces();
-      const workspaceSuggestions = workspaces
-        .filter(workspace => workspace.name.toLowerCase().includes(query))
-        .slice(0, 3)
-        .map(workspace => ({
-          type: 'workspace',
-          text: workspace.name,
-          icon: 'workspace',
-          data: workspace
-        }));
-
-      suggestions.push(...workspaceSuggestions);
 
     } catch (error) {
       console.error('Error getting search suggestions:', error);
@@ -345,7 +297,6 @@ class SearchManager {
       timestamp: Date.now(),
       openTabs: [],
       sessions: [],
-      workspaces: [],
       suspendedTabs: [],
       total: 0
     };

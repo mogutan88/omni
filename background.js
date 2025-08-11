@@ -92,25 +92,54 @@ class OmniBackground {
   }
 
   async saveSession(name, tabs) {
-    const data = await chrome.storage.local.get(['sessions']);
-    const sessions = data.sessions || [];
-    
-    const session = {
-      id: Date.now().toString(),
-      name: name || `Session ${sessions.length + 1}`,
-      tabs: tabs,
-      created: Date.now(),
-      tabCount: tabs.length
-    };
-    
-    sessions.unshift(session);
-    
-    if (sessions.length > 50) {
-      sessions.splice(50);
+    try {
+      // Try sync storage with fallback to local
+      const data = await chrome.storage.sync.get(['sessions']);
+      const sessions = data.sessions || [];
+      
+      const session = {
+        id: Date.now().toString(),
+        name: name || `Session ${sessions.length + 1}`,
+        tabs: tabs,
+        created: Date.now(),
+        tabCount: tabs.length
+      };
+      
+      sessions.unshift(session);
+      
+      // Limit to 20 sessions for sync storage
+      if (sessions.length > 20) {
+        sessions.splice(20);
+      }
+      
+      await chrome.storage.sync.set({ sessions });
+      // Also backup to local storage
+      await chrome.storage.local.set({ sessions_backup: sessions });
+      
+      return session;
+    } catch (error) {
+      console.warn('Sync storage failed, using local storage:', error);
+      
+      // Fallback to local storage
+      const data = await chrome.storage.local.get(['sessions_backup']);
+      const sessions = data.sessions_backup || [];
+      
+      const session = {
+        id: Date.now().toString(),
+        name: name || `Session ${sessions.length + 1}`,
+        tabs: tabs,
+        created: Date.now(),
+        tabCount: tabs.length
+      };
+      
+      sessions.unshift(session);
+      if (sessions.length > 20) {
+        sessions.splice(20);
+      }
+      
+      await chrome.storage.local.set({ sessions_backup: sessions });
+      return session;
     }
-    
-    await chrome.storage.local.set({ sessions });
-    return session;
   }
 
   async handleTabRemoved(tabId) {

@@ -31,11 +31,6 @@
                         <span class="nav-icon">📊</span>
                         <span class="nav-label">Overview</span>
                     </button>
-                    <button class="nav-item" data-view="workspaces">
-                        <span class="nav-icon">🗂️</span>
-                        <span class="nav-label">Workspaces</span>
-                        <span class="nav-badge" id="workspaceCount">0</span>
-                    </button>
                     <button class="nav-item" data-view="sessions">
                         <span class="nav-icon">💾</span>
                         <span class="nav-label">Sessions</span>
@@ -101,7 +96,7 @@
 
                 <div class="header-center">
                     <div class="search-bar">
-                        <input type="text" class="search-input" id="globalSearch" placeholder="Search tabs, sessions, workspaces...">
+                        <input type="text" class="search-input" id="globalSearch" placeholder="Search tabs and sessions...">
                         <button class="search-btn">
                             <span class="icon">🔍</span>
                         </button>
@@ -150,7 +145,18 @@
                             </div>
                             <div class="stat-value" id="activeTabs">0</div>
                             <div class="stat-footer">
-                                <span class="stat-detail">Across all windows</span>
+                                <span class="stat-detail">Currently open</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-header">
+                                <h3>Windows</h3>
+                                <span class="stat-icon">🪟</span>
+                            </div>
+                            <div class="stat-value" id="totalWindows">0</div>
+                            <div class="stat-footer">
+                                <span class="stat-detail">Browser windows</span>
                             </div>
                         </div>
 
@@ -176,16 +182,6 @@
                             </div>
                         </div>
 
-                        <div class="stat-card">
-                            <div class="stat-header">
-                                <h3>Workspaces</h3>
-                                <span class="stat-icon">🗂️</span>
-                            </div>
-                            <div class="stat-value" id="totalWorkspaces">0</div>
-                            <div class="stat-footer">
-                                <span class="stat-detail">Organized</span>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Recent Activity -->
@@ -201,9 +197,9 @@
 
                     <!-- Quick Actions -->
                     <div class="quick-actions-grid">
-                        <button class="quick-action-card">
-                            <span class="action-icon">🚀</span>
-                            <span class="action-label">New Workspace</span>
+                        <button class="quick-action-card" id="saveCurrentWindowBtn">
+                            <span class="action-icon">🪟</span>
+                            <span class="action-label">Save Current Window</span>
                         </button>
                         <button class="quick-action-card">
                             <span class="action-icon">💾</span>
@@ -217,35 +213,6 @@
                             <span class="action-icon">📤</span>
                             <span class="action-label">Export</span>
                         </button>
-                    </div>
-                </section>
-
-                <!-- Workspaces View -->
-                <section id="workspacesView" class="view-container">
-                    <div class="view-header">
-                        <div class="view-actions">
-                            <button class="btn btn-primary" id="newWorkspaceBtn">
-                                <span class="icon">➕</span>
-                                New Workspace
-                            </button>
-                            <div class="view-filters">
-                                <select class="filter-select">
-                                    <option>All Workspaces</option>
-                                    <option>Active</option>
-                                    <option>Archived</option>
-                                </select>
-                                <button class="btn btn-icon" title="Grid View">
-                                    <span class="icon">⊞</span>
-                                </button>
-                                <button class="btn btn-icon" title="List View">
-                                    <span class="icon">☰</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="workspace-grid" id="workspaceGrid">
-                        <!-- Workspace cards will be inserted here -->
                     </div>
                 </section>
 
@@ -331,16 +298,12 @@
                 <section id="searchView" class="view-container">
                     <div class="search-container">
                         <div class="search-header">
-                            <input type="text" class="large-search-input" id="searchQuery" placeholder="What are you looking for?" autofocus>
                             <div class="search-filters">
                                 <label class="filter-checkbox">
                                     <input type="checkbox" checked> Tabs
                                 </label>
                                 <label class="filter-checkbox">
                                     <input type="checkbox" checked> Sessions
-                                </label>
-                                <label class="filter-checkbox">
-                                    <input type="checkbox" checked> Workspaces
                                 </label>
                                 <label class="filter-checkbox">
                                     <input type="checkbox"> History
@@ -490,36 +453,27 @@
     <!-- Modals -->
     <div id="modalOverlay" class="modal-overlay hidden"></div>
 
-    <div id="workspaceModal" class="modal hidden">
+    <div id="sessionModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Create New Workspace</h3>
+                <h3>Save Session</h3>
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Workspace Name</label>
-                    <input type="text" class="form-input" id="workspaceName" placeholder="Enter workspace name">
+                    <label for="sessionName">Session Name</label>
+                    <input type="text" class="form-input" id="sessionName" placeholder="Enter session name">
                 </div>
                 <div class="form-group">
-                    <label>Color</label>
-                    <div class="color-picker">
-                        <button class="color-option" data-color="#4285f4" style="background: #4285f4"></button>
-                        <button class="color-option" data-color="#ea4335" style="background: #ea4335"></button>
-                        <button class="color-option" data-color="#34a853" style="background: #34a853"></button>
-                        <button class="color-option" data-color="#fbbc05" style="background: #fbbc05"></button>
-                        <button class="color-option" data-color="#9c27b0" style="background: #9c27b0"></button>
-                        <button class="color-option" data-color="#ff6d00" style="background: #ff6d00"></button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Description (optional)</label>
-                    <textarea class="form-textarea" id="workspaceDescription" placeholder="Add a description"></textarea>
+                    <label>
+                        <input type="checkbox" id="includeAllWindows" checked>
+                        Include all windows
+                    </label>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary">Cancel</button>
-                <button class="btn btn-primary">Create Workspace</button>
+                <button id="cancelSession" class="btn btn-secondary">Cancel</button>
+                <button id="saveSessionConfirm" class="btn btn-primary">Save Session</button>
             </div>
         </div>
     </div>
@@ -528,8 +482,8 @@
     <div id="toastContainer" class="toast-container"></div>
 
     <!-- Scripts -->
+    <script src="src/storage-manager.js"></script>
     <script src="src/tab-manager.js"></script>
-    <script src="src/workspace-manager.js"></script>
     <script src="src/search-manager.js"></script>
     <script src="src/manager.js"></script>
 </body>

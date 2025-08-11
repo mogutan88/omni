@@ -1,43 +1,59 @@
 # Omni Extension - Product Requirements Document
 
+## Change list
+
+### 2025-08-11 09:40
+- Removed the concept and features of workspaces
+- Added better explanation about the concept of Sessions, with terminology section
+
+
 ## Overview
 
 Omni is a comprehensive browser extension that combines the best features and functionalities from leading tab management extensions including Session Buddy, OneTab, Tabli, and Workona. The extension aims to provide users with the ultimate tab management and workspace organization solution.
 
-## Core Tab Management
+## Terminology
+- Session: Session is a status of Browser tabs and windows at a given time. Can be stored and restored preserving the previous windows and tabs status. 
+- Single window session: Session usually means the status of all tabs and windows, but can be narrowed down to a single window session meaning the status of all tabs in a window.
+- Named session: Session can exist with or without a visible/given name, and can be given a name.
 
-### Tab Operations
-- **One-click tab conversion**: Convert all open tabs to a single organized list (OneTab)
-- **Individual/bulk restoration**: Restore tabs individually or all at once
-- **Memory optimization**: Save up to 95% memory usage by suspending inactive tabs
-- **Tab suspension**: Dramatically reduce CPU load and improve performance
-- **Cross-window management**: Manage tabs across all browser windows simultaneously (Tabli)
+## Core Session Management
 
-## Session & Collection Management
-
-### Session Features
-- **Session saving**: Save complete browsing sessions for later restoration
-- **Collection organization**: Group tabs into named collections/spaces
+### Session operations
+- **One-click session saving**: Save all open tabs and window status, group by Window. This means a current status of browser session is stored with a automatically given name(datetime)
+- **All window/single window saving**: Can save tabs of all windows or a single window
+- **Individual/bulk restoration**: Restore tabs individually, per Window,  or all at once
 - **Crash recovery**: Automatic recovery of tabs after browser crashes
 - **Session preservation**: Maintain sessions across computer restarts
-- **Auto-save functionality**: Automatically save all tabs without user intervention
+- **Auto-save functionality**: Automatically save all tabs without user intervention at every interval
+
+
+## Core Tab Management
+
+### Tab operations
+- **Memory optimization**: Save up to 95% memory usage by suspending inactive tabs
+- **Tab suspension**: Dramatically reduce CPU load and improve performance
+- **Cross-window management**: Manage tabs across all browser windows simultaneously
+  + Show all the tabs list group by Window, and the group can be expandable/collapsible
+  + Filter/Search tabs by user input
+  + Select tabs individually, per Window, or all at once
+  + Save, Restore, Close, Open selected tabs
+
 
 ## Advanced Organization
 
-### Workspace System
-- **Workspace system**: Create dedicated workspaces for different projects (Workona)
+### Omni navigation pane
 - **Tab grouping**: Support Chrome's native tab groups with colors and labels
 - **Drag & drop interface**: Rearrange tabs and organize collections visually
-- **Hierarchical organization**: Create nested groups and categories
+- **Hierarchical organization**: Create nested groups and categories for better session management
 - **Smart categorization**: Auto-categorize tabs by domain or topic
 
 ## Search & Discovery
 
 ### Search Capabilities
-- **Universal search**: Search across all open tabs, saved sessions, and collections
+- **Universal search**: Search across all open tabs, saved sessions, and histories
 - **Advanced filtering**: Filter by title, URL, domain, date, or custom tags
 - **Fuzzy search**: Find tabs with partial matches and typos
-- **Search within collections**: Locate specific items within saved groups
+- **Search within collections**: Locate specific items within saved sessions
 - **Recently accessed**: Quick access to recently used tabs and sessions
 
 ## Data Management & Sync
@@ -89,6 +105,7 @@ Omni is a comprehensive browser extension that combines the best features and fu
 - **Dark/Light modes**: Support for different visual themes
 - **Customizable interface**: Adaptable layout and appearance options
 - **Popup management**: Clean, efficient popup interface for quick access
+- **Omni management page**: Clean and full function interface in the extension index page
 - **Visual indicators**: Clear status indicators for suspended/active tabs
 - **Responsive design**: Optimized for different screen sizes
 
@@ -129,12 +146,12 @@ Omni is a comprehensive browser extension that combines the best features and fu
 ## Implementation Priority
 
 ### Phase 1 (MVP)
-- Core tab management (conversion, restoration, suspension)
+- Core session management (saving, restoration, suspension)
 - Basic session saving and recovery
-- Simple workspace organization
 - Universal search functionality
 
 ### Phase 2 (Enhanced Features)
+- Core tab management (conversion, restoration, suspension)
 - Advanced organization and grouping
 - Export/import capabilities
 - Keyboard shortcuts and quick actions

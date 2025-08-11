@@ -2,8 +2,8 @@ class OmniManager {
   constructor() {
     this.currentView = 'overview';
     this.tabManager = null;
-    this.workspaceManager = null;
     this.searchManager = null;
+    this.storageManager = new StorageManager();
     this.sidebarCollapsed = false;
     
     this.initialize();
@@ -13,8 +13,7 @@ class OmniManager {
     try {
       // Initialize managers
       this.tabManager = new TabManager();
-      this.workspaceManager = new WorkspaceManager();
-      this.searchManager = new SearchManager(this.tabManager, this.workspaceManager);
+      this.searchManager = new SearchManager(this.tabManager, null);
       
       await this.initializeManagers();
       this.setupEventListeners();
@@ -32,7 +31,6 @@ class OmniManager {
   async initializeManagers() {
     await Promise.all([
       this.tabManager.initializeTabSuspension(),
-      this.workspaceManager.initialize(),
       this.searchManager.loadSearchHistory()
     ]);
   }
@@ -78,13 +76,16 @@ class OmniManager {
       this.handleGlobalSearch(e.target.value);
     });
 
+    // Tab item click handlers (event delegation)
+    this.setupTabItemHandlers();
+
     // View-specific actions
     this.setupOverviewActions();
-    this.setupWorkspaceActions();
     this.setupSessionActions();
     this.setupTabActions();
     this.setupSearchActions();
     this.setupPreferencesActions();
+    this.setupSessionModalActions();
     
     // Modal close handlers
     document.querySelectorAll('.modal-close').forEach(btn => {
@@ -110,8 +111,8 @@ class OmniManager {
       card.addEventListener('click', (e) => {
         const label = e.currentTarget.querySelector('.action-label').textContent;
         switch (label) {
-          case 'New Workspace':
-            this.showWorkspaceModal();
+          case 'Save Current Window':
+            this.showSessionModal(true);
             break;
           case 'Save Session':
             this.showSessionModal();
@@ -124,12 +125,6 @@ class OmniManager {
             break;
         }
       });
-    });
-  }
-
-  setupWorkspaceActions() {
-    document.getElementById('newWorkspaceBtn')?.addEventListener('click', () => {
-      this.showWorkspaceModal();
     });
   }
 
@@ -158,8 +153,16 @@ class OmniManager {
   }
 
   setupSearchActions() {
-    document.getElementById('searchQuery')?.addEventListener('input', (e) => {
-      this.performSearch(e.target.value);
+    // Search filter checkboxes - no separate search input needed since we use global search
+    const filterCheckboxes = document.querySelectorAll('.filter-checkbox input[type="checkbox"]');
+    filterCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', () => {
+        // Re-perform search if there's an active query in global search
+        const globalQuery = document.getElementById('globalSearch').value;
+        if (globalQuery && globalQuery.length >= 2) {
+          this.performSearch(globalQuery);
+        }
+      });
     });
   }
 
@@ -172,6 +175,78 @@ class OmniManager {
     // Reset settings
     document.querySelector('.settings-actions .btn-secondary')?.addEventListener('click', () => {
       this.resetSettings();
+    });
+  }
+
+  setupSessionModalActions() {
+    // Session modal actions
+    document.getElementById('cancelSession')?.addEventListener('click', () => {
+      this.closeModals();
+    });
+
+    document.getElementById('saveSessionConfirm')?.addEventListener('click', () => {
+      this.saveSession();
+    });
+  }
+
+  setupTabItemHandlers() {
+    // Event delegation for tab items and action buttons
+    document.addEventListener('click', (e) => {
+      // Handle tab item clicks
+      const tabItem = e.target.closest('.tab-item');
+      if (tabItem && !e.target.closest('.tab-actions')) {
+        const tabId = parseInt(tabItem.dataset.tabId);
+        const isSuspended = tabItem.dataset.suspended === 'true';
+        this.handleTabItemClick(tabId, isSuspended);
+        return;
+      }
+
+      // Handle tab action button clicks
+      const tabActionButton = e.target.closest('.btn-icon[data-tab-id]');
+      if (tabActionButton) {
+        const tabId = parseInt(tabActionButton.dataset.tabId);
+        
+        if (tabActionButton.classList.contains('tab-action-switch')) {
+          this.switchToTab(tabId);
+        } else if (tabActionButton.classList.contains('tab-action-restore')) {
+          this.restoreTab(tabId);
+        } else if (tabActionButton.classList.contains('tab-action-suspend')) {
+          this.suspendTab(tabId);
+        } else if (tabActionButton.classList.contains('tab-action-close')) {
+          this.closeTab(tabId);
+        }
+        return;
+      }
+
+      // Handle session action button clicks
+      const sessionActionButton = e.target.closest('.btn-icon[data-session-id]');
+      if (sessionActionButton) {
+        const sessionId = sessionActionButton.dataset.sessionId;
+        
+        if (sessionActionButton.classList.contains('session-action-restore')) {
+          this.restoreSession(sessionId);
+        }
+        return;
+      }
+      
+      // Handle session restore button clicks
+      const sessionRestoreBtn = e.target.closest('.session-restore-btn');
+      if (sessionRestoreBtn) {
+        const sessionId = sessionRestoreBtn.dataset.sessionId;
+        console.log('Session restore button clicked for:', sessionId);
+        this.restoreSession(sessionId);
+        return;
+      }
+      
+      // Handle session delete button clicks
+      const sessionDeleteBtn = e.target.closest('.session-delete-btn');
+      if (sessionDeleteBtn) {
+        const sessionId = sessionDeleteBtn.dataset.sessionId;
+        console.log('Session delete button clicked for:', sessionId);
+        this.deleteSession(sessionId);
+        return;
+      }
+
     });
   }
 
@@ -191,7 +266,6 @@ class OmniManager {
     // Update page title
     const titles = {
       overview: 'Overview',
-      workspaces: 'Workspaces',
       sessions: 'Sessions',
       tabs: 'All Tabs',
       search: 'Search',
@@ -213,14 +287,14 @@ class OmniManager {
       case 'overview':
         await this.loadOverview();
         break;
-      case 'workspaces':
-        await this.loadWorkspaces();
-        break;
       case 'sessions':
         await this.loadSessions();
         break;
       case 'tabs':
         await this.loadTabs();
+        break;
+      case 'search':
+        await this.loadSearch();
         break;
       case 'history':
         await this.loadHistory();
@@ -237,18 +311,21 @@ class OmniManager {
   async loadOverview() {
     try {
       // Load statistics
-      const [tabs, sessions, workspaces, suspendedTabs] = await Promise.all([
+      const [tabs, sessions, suspendedTabs] = await Promise.all([
         this.tabManager.getAllTabs(),
         this.getSessions(),
-        this.workspaceManager.getAllWorkspaces(),
         this.getSuspendedTabs()
       ]);
 
       // Update stat cards
+      // Count unique windows from tabs
+      const uniqueWindows = new Set(tabs.map(tab => tab.windowId));
+      const windowsCount = uniqueWindows.size;
+
       document.getElementById('activeTabs').textContent = tabs.filter(t => !t.suspended).length;
+      document.getElementById('totalWindows').textContent = windowsCount;
       document.getElementById('suspendedTabs').textContent = suspendedTabs.length;
       document.getElementById('totalSessions').textContent = sessions.length;
-      document.getElementById('totalWorkspaces').textContent = workspaces.length;
 
       // Calculate memory saved (approximate)
       const memorySaved = suspendedTabs.length * 50; // Assume 50MB per tab
@@ -258,48 +335,6 @@ class OmniManager {
       this.loadRecentActivity();
     } catch (error) {
       console.error('Error loading overview:', error);
-    }
-  }
-
-  async loadWorkspaces() {
-    try {
-      const workspaces = this.workspaceManager.getAllWorkspaces();
-      const container = document.getElementById('workspaceGrid');
-      
-      if (workspaces.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">🗂️</div>
-            <h3>No workspaces yet</h3>
-            <p>Create your first workspace to organize your tabs</p>
-            <button class="btn btn-primary" onclick="manager.showWorkspaceModal()">Create Workspace</button>
-          </div>
-        `;
-        return;
-      }
-
-      container.innerHTML = workspaces.map(workspace => `
-        <div class="workspace-card" data-workspace-id="${workspace.id}">
-          <div class="workspace-header" style="background: ${workspace.color}">
-            <div class="workspace-icon">🗂️</div>
-            <div class="workspace-actions">
-              <button class="btn-icon" onclick="manager.switchToWorkspace('${workspace.id}')">
-                <span class="icon">↗️</span>
-              </button>
-            </div>
-          </div>
-          <div class="workspace-body">
-            <div class="workspace-name">${this.escapeHtml(workspace.name)}</div>
-            <div class="workspace-stats">
-              <span>${workspace.tabs.length} tabs</span>
-              <span>•</span>
-              <span>Last used ${this.formatDate(workspace.lastAccessed)}</span>
-            </div>
-          </div>
-        </div>
-      `).join('');
-    } catch (error) {
-      console.error('Error loading workspaces:', error);
     }
   }
 
@@ -327,8 +362,8 @@ class OmniManager {
           <td>${this.formatDate(session.created)}</td>
           <td>${this.formatDate(session.created)}</td>
           <td>
-            <button class="btn btn-sm" onclick="manager.restoreSession('${session.id}')">Restore</button>
-            <button class="btn btn-sm" onclick="manager.deleteSession('${session.id}')">Delete</button>
+            <button class="btn btn-sm session-restore-btn" data-session-id="${session.id}">Restore</button>
+            <button class="btn btn-sm session-delete-btn" data-session-id="${session.id}">Delete</button>
           </td>
         </tr>
       `).join('');
@@ -370,26 +405,26 @@ class OmniManager {
           </div>
           <div class="tab-list">
             ${windowTabs.map(tab => `
-              <div class="tab-item ${tab.suspended ? 'suspended' : ''}" data-tab-id="${tab.id}">
+              <div class="tab-item ${tab.suspended ? 'suspended' : ''}" data-tab-id="${tab.id}" data-suspended="${tab.suspended}">
                 <img class="tab-favicon" src="${tab.favIconUrl || 'data:image/svg+xml,<svg/>'}" onerror="this.style.display='none'">
                 <div class="tab-content">
                   <div class="tab-title">${this.escapeHtml(tab.title)}</div>
                   <div class="tab-url">${this.escapeHtml(this.extractDomain(tab.url))}</div>
                 </div>
                 <div class="tab-actions">
-                  <button class="btn-icon" onclick="manager.switchToTab(${tab.id})" title="Switch to tab">
+                  <button class="btn-icon tab-action-switch" data-tab-id="${tab.id}" title="Switch to tab">
                     <span class="icon">↗️</span>
                   </button>
                   ${tab.suspended ? `
-                    <button class="btn-icon" onclick="manager.restoreTab(${tab.id})" title="Restore">
+                    <button class="btn-icon tab-action-restore" data-tab-id="${tab.id}" title="Restore">
                       <span class="icon">▶️</span>
                     </button>
                   ` : `
-                    <button class="btn-icon" onclick="manager.suspendTab(${tab.id})" title="Suspend">
+                    <button class="btn-icon tab-action-suspend" data-tab-id="${tab.id}" title="Suspend">
                       <span class="icon">⏸️</span>
                     </button>
                   `}
-                  <button class="btn-icon" onclick="manager.closeTab(${tab.id})" title="Close">
+                  <button class="btn-icon tab-action-close" data-tab-id="${tab.id}" title="Close">
                     <span class="icon">❌</span>
                   </button>
                 </div>
@@ -406,7 +441,6 @@ class OmniManager {
   async loadRecentActivity() {
     const activities = [
       { icon: '💾', text: 'Session saved', time: '2 minutes ago' },
-      { icon: '🗂️', text: 'Workspace created', time: '1 hour ago' },
       { icon: '😴', text: '5 tabs suspended', time: '3 hours ago' },
       { icon: '↗️', text: 'Session restored', time: 'Yesterday' }
     ];
@@ -454,28 +488,40 @@ class OmniManager {
 
   async updateSidebarBadges() {
     try {
-      const [tabs, sessions, workspaces] = await Promise.all([
+      const [tabs, sessions] = await Promise.all([
         this.tabManager.getAllTabs(),
-        this.getSessions(),
-        this.workspaceManager.getAllWorkspaces()
+        this.getSessions()
       ]);
 
       document.getElementById('tabCount').textContent = tabs.length;
       document.getElementById('sessionCount').textContent = sessions.length;
-      document.getElementById('workspaceCount').textContent = workspaces.length;
     } catch (error) {
       console.error('Error updating badges:', error);
     }
   }
 
-  showWorkspaceModal() {
-    document.getElementById('workspaceModal').classList.remove('hidden');
+  showSessionModal(currentWindowOnly = false) {
+    console.log('Manager.showSessionModal called with currentWindowOnly:', currentWindowOnly);
+    
+    document.getElementById('sessionModal').classList.remove('hidden');
     document.getElementById('modalOverlay').classList.remove('hidden');
-  }
-
-  showSessionModal() {
-    // Implement session save modal
-    this.showToast('Save session feature coming soon', 'info');
+    
+    const nameInput = document.getElementById('sessionName');
+    const includeAllWindows = document.getElementById('includeAllWindows');
+    
+    if (!nameInput || !includeAllWindows) {
+      console.error('Session modal elements not found:', { nameInput, includeAllWindows });
+      return;
+    }
+    
+    nameInput.value = `Session ${new Date().toLocaleString()}`;
+    includeAllWindows.checked = !currentWindowOnly;
+    nameInput.focus();
+    
+    console.log('Session modal setup complete:', {
+      sessionName: nameInput.value,
+      includeAllWindows: includeAllWindows.checked
+    });
   }
 
   closeModals() {
@@ -516,19 +562,43 @@ class OmniManager {
   }
 
   async handleGlobalSearch(query) {
-    if (query.length < 2) return;
-    
     // Switch to search view
     this.switchView('search');
-    document.getElementById('searchQuery').value = query;
+    
+    // Perform search (will show all items if query is empty)
     await this.performSearch(query);
   }
 
-  async performSearch(query) {
-    if (!query) return;
-
+  async performSearch(query = '') {
     try {
-      const results = await this.searchManager.universalSearch(query);
+      // Get search filter options
+      const filterCheckboxes = document.querySelectorAll('.filter-checkbox input[type="checkbox"]');
+      const searchOptions = {};
+      
+      filterCheckboxes.forEach((checkbox, index) => {
+        const isChecked = checkbox.checked;
+        switch (index) {
+          case 0: // Tabs
+            searchOptions.excludeOpenTabs = !isChecked;
+            searchOptions.excludeSuspended = !isChecked;
+            break;
+          case 1: // Sessions
+            searchOptions.excludeSessions = !isChecked;
+            break;
+          case 2: // History
+            // History functionality can be implemented later
+            break;
+        }
+      });
+
+      let results;
+      if (!query || query.trim().length === 0) {
+        // Show all items when no search query
+        results = await this.getAllItemsForSearch(searchOptions);
+      } else {
+        // Perform actual search
+        results = await this.searchManager.universalSearch(query, searchOptions);
+      }
       const container = document.getElementById('searchResults');
       
       if (results.total === 0) {
@@ -537,26 +607,43 @@ class OmniManager {
       }
 
       // Render search results
+      const displayMessage = query && query.trim().length > 0 ? 
+        `${results.total} results found for "${this.escapeHtml(query)}"` :
+        `Showing all ${results.total} items`;
+      
       container.innerHTML = `
-        <div class="search-result-count">${results.total} results found</div>
+        <div class="search-result-count">${displayMessage}</div>
         ${results.openTabs.length > 0 ? `
           <div class="result-section">
             <h3>Open Tabs (${results.openTabs.length})</h3>
-            ${results.openTabs.map(tab => `
-              <div class="result-item">
-                <span class="result-title">${this.escapeHtml(tab.title)}</span>
-                <span class="result-url">${this.escapeHtml(tab.url)}</span>
-              </div>
-            `).join('')}
+            <div class="tab-list">
+              ${results.openTabs.map(tab => this.renderTabItem(tab, false)).join('')}
+            </div>
+          </div>
+        ` : ''}
+        ${results.suspendedTabs.length > 0 ? `
+          <div class="result-section">
+            <h3>Suspended Tabs (${results.suspendedTabs.length})</h3>
+            <div class="tab-list">
+              ${results.suspendedTabs.map(tab => this.renderTabItem(tab, true)).join('')}
+            </div>
           </div>
         ` : ''}
         ${results.sessions.length > 0 ? `
           <div class="result-section">
-            <h3>Sessions</h3>
+            <h3>Sessions (${results.sessions.length})</h3>
             ${results.sessions.map(item => `
-              <div class="result-item">
-                <span class="result-title">${this.escapeHtml(item.session.name)}</span>
-                <span class="result-count">${item.totalMatches} matching tabs</span>
+              <div class="session-item" data-session-id="${item.session.id}">
+                <div class="item-icon">💾</div>
+                <div class="item-content">
+                  <div class="item-title">${this.escapeHtml(item.session.name)}</div>
+                  <div class="item-subtitle">${item.totalMatches} matching tabs • ${this.formatDate(item.session.created)}</div>
+                </div>
+                <div class="item-actions">
+                  <button class="btn-icon session-action-restore" data-session-id="${item.session.id}" title="Restore Session">
+                    <span class="icon">↗️</span>
+                  </button>
+                </div>
               </div>
             `).join('')}
           </div>
@@ -567,42 +654,35 @@ class OmniManager {
     }
   }
 
-  async switchToWorkspace(workspaceId) {
-    try {
-      await this.workspaceManager.switchToWorkspace(workspaceId);
-      this.showToast('Switched to workspace', 'success');
-      window.close();
-    } catch (error) {
-      console.error('Error switching workspace:', error);
-      this.showToast('Failed to switch workspace', 'error');
-    }
-  }
-
   async restoreSession(sessionId) {
+    console.log('Manager.restoreSession called with sessionId:', sessionId);
     try {
       await this.tabManager.restoreTabsFromSession(sessionId);
+      console.log('Session restored successfully');
       this.showToast('Session restored', 'success');
     } catch (error) {
       console.error('Error restoring session:', error);
-      this.showToast('Failed to restore session', 'error');
+      this.showToast('Failed to restore session: ' + error.message, 'error');
     }
   }
 
   async deleteSession(sessionId) {
-    if (!confirm('Delete this session?')) return;
+    console.log('Manager.deleteSession called with sessionId:', sessionId);
+    if (!confirm('Delete this session?')) {
+      console.log('Session deletion cancelled by user');
+      return;
+    }
 
     try {
-      const data = await chrome.storage.local.get(['sessions']);
-      const sessions = data.sessions || [];
-      const updated = sessions.filter(s => s.id !== sessionId);
-      await chrome.storage.local.set({ sessions: updated });
+      await this.storageManager.removeSession(sessionId);
+      console.log('Session deleted successfully');
       
       this.showToast('Session deleted', 'success');
       await this.loadSessions();
       await this.updateSidebarBadges();
     } catch (error) {
       console.error('Error deleting session:', error);
-      this.showToast('Failed to delete session', 'error');
+      this.showToast('Failed to delete session: ' + error.message, 'error');
     }
   }
 
@@ -613,6 +693,20 @@ class OmniManager {
       await chrome.windows.update(tab.windowId, { focused: true });
     } catch (error) {
       console.error('Error switching to tab:', error);
+    }
+  }
+
+  async handleTabItemClick(tabId, isSuspended) {
+    try {
+      if (isSuspended) {
+        // If tab is suspended, restore it (which will also switch to it)
+        await this.restoreTab(tabId);
+      } else {
+        // If tab is active, just switch to it
+        await this.switchToTab(tabId);
+      }
+    } catch (error) {
+      console.error('Error handling tab item click:', error);
     }
   }
 
@@ -631,6 +725,9 @@ class OmniManager {
       await this.tabManager.restoreTab(tabId);
       await this.loadTabs();
       this.showToast('Tab restored', 'success');
+      
+      // Switch to the restored tab
+      await this.switchToTab(tabId);
     } catch (error) {
       console.error('Error restoring tab:', error);
     }
@@ -643,6 +740,57 @@ class OmniManager {
       this.showToast('Tab closed', 'success');
     } catch (error) {
       console.error('Error closing tab:', error);
+    }
+  }
+
+  async saveSession() {
+    const name = document.getElementById('sessionName').value.trim() || `Session ${Date.now()}`;
+    const includeAllWindows = document.getElementById('includeAllWindows').checked;
+
+    console.log('Manager.saveSession called:', { name, includeAllWindows });
+
+    try {
+      let tabs;
+      if (includeAllWindows) {
+        console.log('Getting all tabs from all windows');
+        tabs = await this.tabManager.getAllTabs();
+      } else {
+        console.log('Getting tabs from current window only');
+        // Get only current window tabs
+        const currentWindow = await chrome.windows.getCurrent();
+        console.log('Current window ID:', currentWindow.id);
+        const allTabs = await this.tabManager.getAllTabs();
+        tabs = allTabs.filter(tab => tab.windowId === currentWindow.id);
+      }
+      
+      console.log('Tabs to save:', tabs.length);
+      
+      const tabsData = tabs.map(tab => ({
+        id: tab.id,
+        url: tab.url,
+        title: tab.title,
+        favIconUrl: tab.favIconUrl,
+        windowId: tab.windowId,
+        index: tab.index,
+        saved: Date.now()
+      }));
+
+      console.log('Calling tabManager.saveTabsAsSession with:', tabsData.length, 'tabs');
+      await this.tabManager.saveTabsAsSession(name, tabsData);
+      
+      console.log('Session saved successfully, closing modals');
+      this.closeModals();
+      this.showToast('Session saved successfully', 'success');
+      
+      // Refresh current view if it's sessions
+      if (this.currentView === 'sessions') {
+        await this.loadSessions();
+      }
+      
+      await this.updateSidebarBadges();
+    } catch (error) {
+      console.error('Error saving session in manager:', error);
+      this.showToast('Failed to save session: ' + error.message, 'error');
     }
   }
 
@@ -726,14 +874,109 @@ class OmniManager {
     }, 3000);
   }
 
+  async loadSearch() {
+    // Load all items when search view is first opened
+    // Check if there's a query in the global search box
+    const globalQuery = document.getElementById('globalSearch').value;
+    await this.performSearch(globalQuery);
+  }
+
   async getSessions() {
-    const data = await chrome.storage.local.get(['sessions']);
-    return data.sessions || [];
+    return await this.storageManager.getSessions();
   }
 
   async getSuspendedTabs() {
     const data = await chrome.storage.local.get(['suspendedTabs']);
     return data.suspendedTabs || [];
+  }
+
+  async getAllItemsForSearch(searchOptions) {
+    try {
+      const results = {
+        query: '',
+        timestamp: Date.now(),
+        openTabs: [],
+        sessions: [],
+        suspendedTabs: [],
+        total: 0
+      };
+
+      const promises = [];
+
+      // Get open tabs if not excluded
+      if (!searchOptions.excludeOpenTabs) {
+        promises.push(this.tabManager.getAllTabs().then(tabs => {
+          results.openTabs = tabs.filter(tab => !tab.suspended);
+        }));
+      }
+
+      // Get suspended tabs if not excluded
+      if (!searchOptions.excludeSuspended) {
+        promises.push(this.getSuspendedTabs().then(suspendedTabs => {
+          results.suspendedTabs = suspendedTabs;
+        }));
+      }
+
+      // Get sessions if not excluded
+      if (!searchOptions.excludeSessions) {
+        promises.push(this.getSessions().then(sessions => {
+          results.sessions = sessions.map(session => ({
+            session,
+            tabs: session.tabs || [],
+            totalMatches: session.tabs ? session.tabs.length : 0
+          }));
+        }));
+      }
+
+
+      await Promise.all(promises);
+
+      // Calculate total
+      results.total = results.openTabs.length + 
+                     results.suspendedTabs.length +
+                     results.sessions.reduce((sum, s) => sum + s.tabs.length, 0);
+
+      return results;
+    } catch (error) {
+      console.error('Error getting all items for search:', error);
+      return {
+        query: '',
+        timestamp: Date.now(),
+        openTabs: [],
+        sessions: [],
+        suspendedTabs: [],
+        total: 0
+      };
+    }
+  }
+
+  renderTabItem(tab, isSuspended = false) {
+    return `
+      <div class="tab-item ${isSuspended ? 'suspended' : ''}" data-tab-id="${tab.id}" data-suspended="${isSuspended}">
+        <img class="tab-favicon" src="${tab.favIconUrl || 'data:image/svg+xml,<svg/>'}" onerror="this.style.display='none'">
+        <div class="tab-content">
+          <div class="tab-title">${this.escapeHtml(tab.title)}</div>
+          <div class="tab-url">${this.escapeHtml(this.extractDomain(tab.url))}</div>
+        </div>
+        <div class="tab-actions">
+          <button class="btn-icon tab-action-switch" data-tab-id="${tab.id}" title="Switch to tab">
+            <span class="icon">↗️</span>
+          </button>
+          ${isSuspended ? `
+            <button class="btn-icon tab-action-restore" data-tab-id="${tab.id}" title="Restore">
+              <span class="icon">▶️</span>
+            </button>
+          ` : `
+            <button class="btn-icon tab-action-suspend" data-tab-id="${tab.id}" title="Suspend">
+              <span class="icon">⏸️</span>
+            </button>
+          `}
+          <button class="btn-icon tab-action-close" data-tab-id="${tab.id}" title="Close">
+            <span class="icon">❌</span>
+          </button>
+        </div>
+      </div>
+    `;
   }
 
   extractDomain(url) {

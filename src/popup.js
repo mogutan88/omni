@@ -1,8 +1,8 @@
 class OmniPopup {
   constructor() {
     this.tabManager = null;
-    this.workspaceManager = null;
     this.searchManager = null;
+    this.storageManager = new StorageManager();
     this.currentTab = 'dashboard';
     this.searchTimeout = null;
     
@@ -12,12 +12,12 @@ class OmniPopup {
   async initialize() {
     try {
       this.tabManager = new TabManager();
-      this.workspaceManager = new WorkspaceManager();
-      this.searchManager = new SearchManager(this.tabManager, this.workspaceManager);
+      this.searchManager = new SearchManager(this.tabManager, null);
       
       await this.initializeManagers();
       this.setupEventListeners();
       this.loadDashboard();
+      this.focusSearchInput();
     } catch (error) {
       console.error('Error initializing popup:', error);
       this.showError('Failed to initialize extension');
@@ -27,7 +27,6 @@ class OmniPopup {
   async initializeManagers() {
     await Promise.all([
       this.tabManager.initializeTabSuspension(),
-      this.workspaceManager.initialize(),
       this.searchManager.loadSearchHistory()
     ]);
   }
@@ -66,12 +65,8 @@ class OmniPopup {
       this.showSessionModal();
     });
 
-    document.getElementById('createWorkspace').addEventListener('click', () => {
-      this.showWorkspaceModal();
-    });
-
-    document.getElementById('newWorkspaceBtn').addEventListener('click', () => {
-      this.showWorkspaceModal();
+    document.getElementById('saveCurrentWindow').addEventListener('click', () => {
+      this.showSessionModal(true);
     });
 
     document.getElementById('saveSessionBtn').addEventListener('click', () => {
@@ -83,7 +78,6 @@ class OmniPopup {
   }
 
   setupModalEventListeners() {
-    const workspaceModal = document.getElementById('workspaceModal');
     const sessionModal = document.getElementById('sessionModal');
 
     document.querySelectorAll('.modal-close').forEach(btn => {
@@ -92,13 +86,6 @@ class OmniPopup {
       });
     });
 
-    document.getElementById('cancelWorkspace').addEventListener('click', () => {
-      this.hideModals();
-    });
-
-    document.getElementById('saveWorkspace').addEventListener('click', () => {
-      this.saveWorkspace();
-    });
 
     document.getElementById('cancelSession').addEventListener('click', () => {
       this.hideModals();
@@ -108,23 +95,48 @@ class OmniPopup {
       this.saveSession();
     });
 
-    document.querySelectorAll('.color-preset').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const color = e.target.dataset.color;
-        document.getElementById('workspaceColor').value = color;
-      });
-    });
-
-    workspaceModal.addEventListener('click', (e) => {
-      if (e.target === workspaceModal) {
-        this.hideModals();
-      }
-    });
 
     sessionModal.addEventListener('click', (e) => {
       if (e.target === sessionModal) {
         this.hideModals();
       }
+    });
+
+    // Add event delegation for clickable tabs in search results
+    document.addEventListener('click', (e) => {
+      const clickableTab = e.target.closest('.clickable-tab');
+      if (clickableTab) {
+        const tabId = clickableTab.dataset.tabId;
+        const type = clickableTab.dataset.type;
+        console.log('Event delegation tab click:', tabId, type);
+        this.handleTabClick(tabId, type);
+        return;
+      }
+
+      // Handle session restore buttons
+      const sessionRestoreBtn = e.target.closest('.session-restore-btn');
+      if (sessionRestoreBtn) {
+        const sessionId = sessionRestoreBtn.dataset.sessionId;
+        this.restoreSession(sessionId);
+        return;
+      }
+
+      // Handle session delete buttons
+      const sessionDeleteBtn = e.target.closest('.session-delete-btn');
+      if (sessionDeleteBtn) {
+        const sessionId = sessionDeleteBtn.dataset.sessionId;
+        this.deleteSession(sessionId);
+        return;
+      }
+
+      // Handle session search result clicks
+      const sessionSearchResult = e.target.closest('.session-search-result');
+      if (sessionSearchResult) {
+        const sessionId = sessionSearchResult.dataset.sessionId;
+        this.restoreSession(sessionId);
+        return;
+      }
+
     });
   }
 
@@ -146,16 +158,19 @@ class OmniPopup {
     try {
       this.showLoading();
       
-      const [openTabs, sessions, workspaces, suspendedTabs] = await Promise.all([
+      const [openTabs, sessions, suspendedTabs] = await Promise.all([
         this.tabManager.getAllTabs(),
         this.getSessions(),
-        this.workspaceManager.getAllWorkspaces(),
         this.getSuspendedTabs()
       ]);
 
+      // Count unique windows from tabs
+      const uniqueWindows = new Set(openTabs.map(tab => tab.windowId));
+      const windowsCount = uniqueWindows.size;
+
       document.getElementById('openTabsCount').textContent = openTabs.length;
+      document.getElementById('windowsCount').textContent = windowsCount;
       document.getElementById('sessionsCount').textContent = sessions.length;
-      document.getElementById('workspacesCount').textContent = workspaces.length;
       document.getElementById('suspendedTabsCount').textContent = suspendedTabs.length;
 
       this.renderRecentSessions(sessions.slice(0, 5));
@@ -168,8 +183,7 @@ class OmniPopup {
   }
 
   async getSessions() {
-    const data = await chrome.storage.local.get(['sessions']);
-    return data.sessions || [];
+    return await this.storageManager.getSessions();
   }
 
   async getSuspendedTabs() {
@@ -193,7 +207,7 @@ class OmniPopup {
           <div class="item-subtitle">${session.tabCount} tabs • ${this.formatDate(session.created)}</div>
         </div>
         <div class="item-actions">
-          <button class="item-action" onclick="popup.restoreSession('${session.id}')" title="Restore">
+          <button class="item-action session-restore-btn" data-session-id="${session.id}" title="Restore">
             ↗️
           </button>
         </div>
@@ -201,39 +215,6 @@ class OmniPopup {
     `).join('');
   }
 
-  async loadWorkspaces() {
-    try {
-      const workspaces = this.workspaceManager.getAllWorkspaces();
-      const container = document.getElementById('workspacesList');
-      
-      if (workspaces.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No workspaces created yet</p></div>';
-        return;
-      }
-
-      container.innerHTML = workspaces.map(workspace => `
-        <div class="workspace-item" data-workspace-id="${workspace.id}">
-          <div class="workspace-color" style="background-color: ${workspace.color}"></div>
-          <div class="item-content">
-            <div class="item-title">${this.escapeHtml(workspace.name)}</div>
-            <div class="item-subtitle">${workspace.tabs.length} tabs • ${this.formatDate(workspace.lastAccessed)}</div>
-          </div>
-          <div class="item-actions">
-            <button class="item-action" onclick="popup.switchWorkspace('${workspace.id}')" title="Switch">
-              ↗️
-            </button>
-            ${workspace.id !== 'default' ? `
-              <button class="item-action" onclick="popup.deleteWorkspace('${workspace.id}')" title="Delete">
-                🗑️
-              </button>
-            ` : ''}
-          </div>
-        </div>
-      `).join('');
-    } catch (error) {
-      console.error('Error loading workspaces:', error);
-    }
-  }
 
   async loadSessions(sortBy = 'recent') {
     try {
@@ -265,10 +246,10 @@ class OmniPopup {
             <div class="item-subtitle">${session.tabCount} tabs • ${this.formatDate(session.created)}</div>
           </div>
           <div class="item-actions">
-            <button class="item-action" onclick="popup.restoreSession('${session.id}')" title="Restore">
+            <button class="item-action session-restore-btn" data-session-id="${session.id}" title="Restore">
               ↗️
             </button>
-            <button class="item-action" onclick="popup.deleteSession('${session.id}')" title="Delete">
+            <button class="item-action session-delete-btn" data-session-id="${session.id}" title="Delete">
               🗑️
             </button>
           </div>
@@ -312,7 +293,7 @@ class OmniPopup {
           <img class="item-icon" src="${tab.favIconUrl || 'data:image/svg+xml,<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 16 16\\"><rect width=\\"16\\" height=\\"16\\" fill=\\"#f1f3f4\\"/></svg>'}" onerror="this.style.display='none'">
           <div class="item-content">
             <div class="item-title">${this.escapeHtml(tab.title)}</div>
-            <div class="item-subtitle">${this.escapeHtml(this.extractDomain(tab.url))}</div>
+            <div class="item-subtitle">${this.escapeHtml(this.extractDomain(tab.url))} • Window ${tab.windowId}</div>
           </div>
           <div class="item-actions">
             <button class="item-action" onclick="popup.switchToTab(${tab.id})" title="Switch to tab">
@@ -536,21 +517,21 @@ class OmniPopup {
 
     if (type === 'tab' || type === 'suspended') {
       html += items.map(item => `
-        <div class="search-result-item" onclick="popup.${type === 'suspended' ? 'restoreTab' : 'switchToTab'}(${item.id})">
+        <div class="search-result-item clickable-tab" data-tab-id="${item.id}" data-type="${type}" style="cursor: pointer;">
           <div class="item-title">${this.escapeHtml(item.title)}</div>
-          <div class="item-subtitle">${this.escapeHtml(this.extractDomain(item.url))}</div>
+          <div class="item-subtitle">${this.escapeHtml(this.extractDomain(item.url))} • Window ${item.windowId || 'N/A'}</div>
         </div>
       `).join('');
     } else if (type === 'session') {
       html += items.map(item => `
-        <div class="search-result-item" onclick="popup.restoreSession('${item.session.id}')">
+        <div class="search-result-item session-search-result" data-session-id="${item.session.id}">
           <div class="item-title">${this.escapeHtml(item.session.name)}</div>
           <div class="item-subtitle">${item.totalMatches} matching tabs</div>
         </div>
       `).join('');
     } else if (type === 'workspace') {
       html += items.map(item => `
-        <div class="search-result-item" onclick="popup.switchWorkspace('${item.workspace.id}')">
+        <div class="search-result-item workspace-search-result" data-workspace-id="${item.workspace.id}">
           <div class="item-title">${this.escapeHtml(item.workspace.name)}</div>
           <div class="item-subtitle">${item.totalMatches} matching tabs</div>
         </div>
@@ -568,33 +549,16 @@ class OmniPopup {
     this.switchTab(this.currentTab);
   }
 
-  showWorkspaceModal(workspaceId = null) {
-    const modal = document.getElementById('workspaceModal');
-    const title = document.getElementById('workspaceModalTitle');
-    const nameInput = document.getElementById('workspaceName');
-    const colorInput = document.getElementById('workspaceColor');
-
-    if (workspaceId) {
-      const workspace = this.workspaceManager.getWorkspace(workspaceId);
-      title.textContent = 'Edit Workspace';
-      nameInput.value = workspace.name;
-      colorInput.value = workspace.color;
-    } else {
-      title.textContent = 'Create Workspace';
-      nameInput.value = '';
-      colorInput.value = '#4285f4';
-    }
-
+  showSessionModal(currentWindowOnly = false) {
+    const modal = document.getElementById('sessionModal');
+    const nameInput = document.getElementById('sessionName');
+    const includeAllWindows = document.getElementById('includeAllWindows');
+    
+    nameInput.value = `Session ${new Date().toLocaleString()}`;
+    includeAllWindows.checked = !currentWindowOnly;
+    
     modal.classList.remove('hidden');
     nameInput.focus();
-  }
-
-  showSessionModal() {
-    const modal = document.getElementById('sessionModal');
-    document.getElementById('sessionName').value = '';
-    document.getElementById('includeAllWindows').checked = true;
-    modal.classList.remove('hidden');
-    document.getElementById('sessionName').focus();
   }
 
   hideModals() {
@@ -603,34 +567,21 @@ class OmniPopup {
     });
   }
 
-  async saveWorkspace() {
-    const name = document.getElementById('workspaceName').value.trim();
-    const color = document.getElementById('workspaceColor').value;
-
-    if (!name) {
-      alert('Please enter a workspace name');
-      return;
-    }
-
-    try {
-      await this.workspaceManager.createWorkspace(name, color);
-      this.hideModals();
-      if (this.currentTab === 'workspaces') {
-        this.loadWorkspaces();
-      }
-      this.loadDashboard();
-    } catch (error) {
-      console.error('Error saving workspace:', error);
-      alert('Failed to save workspace');
-    }
-  }
-
   async saveSession() {
     const name = document.getElementById('sessionName').value.trim() || `Session ${Date.now()}`;
     const includeAllWindows = document.getElementById('includeAllWindows').checked;
 
     try {
-      const tabs = await this.tabManager.getAllTabs();
+      let tabs;
+      if (includeAllWindows) {
+        tabs = await this.tabManager.getAllTabs();
+      } else {
+        // Get only current window tabs
+        const currentWindow = await chrome.windows.getCurrent();
+        const allTabs = await this.tabManager.getAllTabs();
+        tabs = allTabs.filter(tab => tab.windowId === currentWindow.id);
+      }
+      
       const tabsData = tabs.map(tab => ({
         id: tab.id,
         url: tab.url,
@@ -686,11 +637,7 @@ class OmniPopup {
     }
 
     try {
-      const data = await chrome.storage.local.get(['sessions']);
-      const sessions = data.sessions || [];
-      const updatedSessions = sessions.filter(s => s.id !== sessionId);
-      
-      await chrome.storage.local.set({ sessions: updatedSessions });
+      await this.storageManager.removeSession(sessionId);
       
       if (this.currentTab === 'sessions') {
         this.loadSessions();
@@ -702,46 +649,38 @@ class OmniPopup {
     }
   }
 
-  async switchWorkspace(workspaceId) {
+  async handleTabClick(tabId, type) {
+    console.log('Tab clicked:', tabId, type, typeof tabId); // Debug log with type
     try {
-      this.showLoading();
-      await this.workspaceManager.switchToWorkspace(workspaceId);
-      this.hideLoading();
-      window.close();
-    } catch (error) {
-      console.error('Error switching workspace:', error);
-      this.hideLoading();
-      alert('Failed to switch workspace');
-    }
-  }
-
-  async deleteWorkspace(workspaceId) {
-    if (!confirm('Are you sure you want to delete this workspace?')) {
-      return;
-    }
-
-    try {
-      await this.workspaceManager.deleteWorkspace(workspaceId);
+      // Convert tabId to number if it's a string
+      const numericTabId = parseInt(tabId, 10);
+      console.log('Converted tabId:', numericTabId);
       
-      if (this.currentTab === 'workspaces') {
-        this.loadWorkspaces();
+      if (type === 'suspended') {
+        await this.restoreTab(numericTabId);
+      } else {
+        await this.switchToTab(numericTabId);
       }
-      this.loadDashboard();
     } catch (error) {
-      console.error('Error deleting workspace:', error);
-      alert('Failed to delete workspace');
+      console.error('Error handling tab click:', error);
+      console.error('TabId was:', tabId, 'Type was:', type);
     }
   }
 
   async switchToTab(tabId) {
     try {
+      console.log('Attempting to switch to tab:', tabId);
       await chrome.tabs.update(tabId, { active: true });
+      console.log('Tab activated successfully');
       const tab = await chrome.tabs.get(tabId);
+      console.log('Got tab info:', tab);
       await chrome.windows.update(tab.windowId, { focused: true });
+      console.log('Window focused successfully');
       window.close();
     } catch (error) {
       console.error('Error switching to tab:', error);
-      alert('Failed to switch to tab');
+      console.error('TabId was:', tabId, typeof tabId);
+      alert(`Failed to switch to tab: ${error.message}`);
     }
   }
 
@@ -760,14 +699,22 @@ class OmniPopup {
 
   async restoreTab(tabId) {
     try {
+      console.log('Attempting to restore tab:', tabId);
       await this.tabManager.restoreTab(tabId);
-      if (this.currentTab === 'tabs') {
-        this.loadAllTabs();
-      }
-      this.loadDashboard();
+      console.log('Tab restored successfully');
+      
+      // After restoring, switch to the tab like switchToTab does
+      await chrome.tabs.update(tabId, { active: true });
+      console.log('Tab activated successfully');
+      const tab = await chrome.tabs.get(tabId);
+      console.log('Got tab info:', tab);
+      await chrome.windows.update(tab.windowId, { focused: true });
+      console.log('Window focused successfully');
+      window.close();
     } catch (error) {
       console.error('Error restoring tab:', error);
-      alert('Failed to restore tab');
+      console.error('TabId was:', tabId, typeof tabId);
+      alert(`Failed to restore tab: ${error.message}`);
     }
   }
 
@@ -1060,9 +1007,9 @@ class OmniPopup {
         });
       }
       
-      const data = await chrome.storage.local.get(['sessions']);
+      const data = await chrome.storage.sync.get(['sessions']);
       const existingSessions = data.sessions || [];
-      await chrome.storage.local.set({ 
+      await chrome.storage.sync.set({ 
         sessions: [...existingSessions, ...testSessions] 
       });
       
@@ -1180,6 +1127,22 @@ class OmniPopup {
     } catch (error) {
       console.error('Error opening manager:', error);
       alert('Failed to open manager');
+    }
+  }
+
+  focusSearchInput() {
+    try {
+      // Use requestAnimationFrame to ensure DOM is fully rendered
+      requestAnimationFrame(() => {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+          searchInput.focus();
+          // Optional: select all text if there's any pre-filled text
+          searchInput.select();
+        }
+      });
+    } catch (error) {
+      console.error('Error focusing search input:', error);
     }
   }
 }
