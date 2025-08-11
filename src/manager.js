@@ -297,6 +297,15 @@ class OmniManager {
         return;
       }
       
+      // Handle session restore windows button clicks
+      const sessionRestoreWindowBtn = e.target.closest('.session-restore-window-btn');
+      if (sessionRestoreWindowBtn) {
+        const sessionId = sessionRestoreWindowBtn.dataset.sessionId;
+        console.log('Session restore windows button clicked for:', sessionId);
+        this.restoreSessionWindows(sessionId);
+        return;
+      }
+      
       // Handle session delete button clicks
       const sessionDeleteBtn = e.target.closest('.session-delete-btn');
       if (sessionDeleteBtn) {
@@ -416,12 +425,18 @@ class OmniManager {
       tbody.innerHTML = sessions.map(session => `
         <tr data-session-id="${session.id}">
           <td><input type="checkbox" class="session-checkbox" data-id="${session.id}"></td>
-          <td>${this.escapeHtml(session.name)}</td>
+          <td>
+            <div>${this.escapeHtml(session.name)}</div>
+            ${session.windowCount ? `<small class="text-muted">${session.windowCount} windows</small>` : ''}
+          </td>
           <td>${session.tabCount}</td>
           <td>${this.formatDate(session.created)}</td>
           <td>${this.formatDate(session.created)}</td>
           <td>
             <button class="btn btn-sm session-restore-btn" data-session-id="${session.id}">Restore</button>
+            ${session.windows && session.windows.length > 1 ? 
+              `<button class="btn btn-sm session-restore-window-btn" data-session-id="${session.id}">Restore Windows</button>` : 
+              ''}
             <button class="btn btn-sm session-delete-btn" data-session-id="${session.id}">Delete</button>
           </td>
         </tr>
@@ -586,11 +601,38 @@ class OmniManager {
 
   async quickSaveSession() {
     try {
-      const tabs = await this.tabManager.getAllTabs();
-      const sessionName = `Quick Save ${new Date().toLocaleString()}`;
-      await this.tabManager.saveTabsAsSession(sessionName, tabs);
-      this.showToast('Session saved successfully', 'success');
-      await this.updateSidebarBadges();
+      const windows = await chrome.windows.getAll({ populate: true });
+      const windowsData = [];
+      
+      for (const window of windows) {
+        const userTabs = window.tabs.filter(tab => this.tabManager.isUserTab(tab.url));
+        
+        if (userTabs.length > 0) {
+          windowsData.push({
+            windowId: window.id,
+            tabs: userTabs.map(tab => ({
+              id: tab.id,
+              url: tab.url,
+              title: tab.title,
+              favIconUrl: tab.favIconUrl,
+              windowId: tab.windowId,
+              index: tab.index,
+              pinned: tab.pinned,
+              active: tab.active,
+              saved: Date.now()
+            }))
+          });
+        }
+      }
+      
+      if (windowsData.length > 0) {
+        const sessionName = `Quick Save ${new Date().toLocaleString()}`;
+        await this.tabManager.saveWindowsAsSession(sessionName, windowsData);
+        this.showToast('Session saved successfully', 'success');
+        await this.updateSidebarBadges();
+      } else {
+        this.showToast('No tabs to save', 'warning');
+      }
     } catch (error) {
       console.error('Error saving session:', error);
       this.showToast('Failed to save session', 'error');
@@ -711,6 +753,16 @@ class OmniManager {
     } catch (error) {
       console.error('Error restoring session:', error);
       this.showToast('Failed to restore session: ' + error.message, 'error');
+    }
+  }
+
+  async restoreSessionWindows(sessionId) {
+    try {
+      const result = await this.tabManager.restoreWindowsFromSession(sessionId);
+      this.showToast(`Restored ${result.length} windows`, 'success');
+    } catch (error) {
+      console.error('Error restoring session windows:', error);
+      this.showToast('Failed to restore session windows: ' + error.message, 'error');
     }
   }
 

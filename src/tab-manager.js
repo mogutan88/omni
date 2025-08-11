@@ -112,30 +112,45 @@ class TabManager {
 
   async convertAllTabs() {
     try {
-      const allTabs = await this.getAllTabs();
-      const tabsToConvert = allTabs.filter(tab => !tab.suspended);
+      const windows = await chrome.windows.getAll({ populate: true });
+      const windowsData = [];
       
-      const convertedTabs = [];
-      
-      for (const tab of tabsToConvert) {
-        convertedTabs.push({
+      for (const window of windows) {
+        const tabsToConvert = window.tabs.filter(tab => 
+          this.isUserTab(tab.url) && !this.suspendedTabs.has(tab.id)
+        );
+        
+        if (tabsToConvert.length === 0) continue;
+        
+        const convertedTabs = tabsToConvert.map(tab => ({
           id: tab.id,
           url: tab.url,
           title: tab.title,
           favIconUrl: tab.favIconUrl,
           windowId: tab.windowId,
           index: tab.index,
+          pinned: tab.pinned,
+          active: tab.active,
           saved: Date.now()
+        }));
+        
+        // Simply preserve window grouping
+        windowsData.push({
+          windowId: window.id,
+          tabs: convertedTabs
         });
         
-        await chrome.tabs.remove(tab.id);
+        // Remove the tabs
+        for (const tab of tabsToConvert) {
+          await chrome.tabs.remove(tab.id);
+        }
       }
 
-      if (convertedTabs.length > 0) {
-        await this.saveTabsAsSession('Converted Tabs', convertedTabs);
+      if (windowsData.length > 0) {
+        await this.saveWindowsAsSession('Converted Tabs', windowsData);
       }
       
-      return convertedTabs;
+      return windowsData;
     } catch (error) {
       console.error('Error converting tabs:', error);
       throw error;
@@ -196,11 +211,40 @@ class TabManager {
 
   async saveTabsAsSession(sessionName, tabsData) {
     try {
+      // Group tabs by windowId
+      const windowGroups = {};
+      for (const tab of tabsData) {
+        const windowId = tab.windowId || 'default';
+        if (!windowGroups[windowId]) {
+          windowGroups[windowId] = [];
+        }
+        windowGroups[windowId].push(tab);
+      }
+      
+      // Convert to windows array
+      const windowsData = Object.entries(windowGroups).map(([windowId, tabs]) => ({
+        windowId: windowId,
+        tabs: tabs
+      }));
+      
+      return await this.saveWindowsAsSession(sessionName, windowsData);
+    } catch (error) {
+      console.error('Error saving session:', error);
+      throw error;
+    }
+  }
+  
+  async saveWindowsAsSession(sessionName, windowsData) {
+    try {
+      const totalTabs = windowsData.reduce((sum, window) => sum + window.tabs.length, 0);
+      
       const session = {
         id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         name: sessionName,
-        tabs: tabsData,
-        tabCount: tabsData.length,
+        windows: windowsData,
+        tabs: windowsData.flatMap(w => w.tabs), // For backward compatibility
+        tabCount: totalTabs,
+        windowCount: windowsData.length,
         created: Date.now(),
         lastAccessed: Date.now()
       };
@@ -208,7 +252,7 @@ class TabManager {
       // Use StorageManager for persistent session storage
       return await this.storageManager.addSession(session);
     } catch (error) {
-      console.error('Error saving session:', error);
+      console.error('Error saving windows session:', error);
       throw error;
     }
   }
@@ -222,6 +266,12 @@ class TabManager {
         throw new Error('Session not found');
       }
 
+      // If session has windows data, use the enhanced restoration
+      if (session.windows && session.windows.length > 0) {
+        return await this.restoreWindowsFromSession(sessionId, selectedTabs);
+      }
+      
+      // Fallback for legacy sessions without window data
       const tabsToRestore = selectedTabs || session.tabs;
       const restoredTabs = [];
 
@@ -229,7 +279,8 @@ class TabManager {
         try {
           const newTab = await chrome.tabs.create({
             url: tabData.url,
-            active: false
+            active: false,
+            pinned: tabData.pinned || false
           });
           
           restoredTabs.push(newTab);
@@ -241,6 +292,81 @@ class TabManager {
       return restoredTabs;
     } catch (error) {
       console.error('Error restoring tabs from session:', error);
+      throw error;
+    }
+  }
+  
+  async restoreWindowsFromSession(sessionId, selectedTabs = null) {
+    try {
+      const sessions = await this.storageManager.getSessions();
+      const session = sessions.find(s => s.id === sessionId);
+      
+      if (!session) {
+        throw new Error('Session not found');
+      }
+
+      const windowsToRestore = session.windows || [];
+      const restoredWindows = [];
+      
+      for (const windowData of windowsToRestore) {
+        try {
+          let tabsToRestore = windowData.tabs;
+          
+          // Filter to selected tabs if specified
+          if (selectedTabs) {
+            const selectedUrls = new Set(selectedTabs.map(t => t.url));
+            tabsToRestore = tabsToRestore.filter(tab => selectedUrls.has(tab.url));
+          }
+          
+          if (tabsToRestore.length === 0) continue;
+          
+          // Create the window with the first tab
+          const firstTab = tabsToRestore[0];
+          const newWindow = await chrome.windows.create({
+            url: firstTab.url
+          });
+          
+          // Update the first tab properties
+          if (firstTab.pinned) {
+            await chrome.tabs.update(newWindow.tabs[0].id, { pinned: true });
+          }
+          
+          // Create remaining tabs in the window
+          for (let i = 1; i < tabsToRestore.length; i++) {
+            const tabData = tabsToRestore[i];
+            try {
+              const newTab = await chrome.tabs.create({
+                url: tabData.url,
+                windowId: newWindow.id,
+                index: tabData.index,
+                active: false,
+                pinned: tabData.pinned || false
+              });
+              
+              newWindow.tabs.push(newTab);
+            } catch (error) {
+              console.error('Error restoring individual tab:', error);
+            }
+          }
+          
+          // Activate the originally active tab
+          const originallyActiveTab = tabsToRestore.find(t => t.active);
+          if (originallyActiveTab) {
+            const activeTabIndex = tabsToRestore.findIndex(t => t.active);
+            if (activeTabIndex >= 0 && newWindow.tabs[activeTabIndex]) {
+              await chrome.tabs.update(newWindow.tabs[activeTabIndex].id, { active: true });
+            }
+          }
+          
+          restoredWindows.push(newWindow);
+        } catch (error) {
+          console.error('Error restoring window:', error);
+        }
+      }
+
+      return restoredWindows;
+    } catch (error) {
+      console.error('Error restoring windows from session:', error);
       throw error;
     }
   }

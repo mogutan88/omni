@@ -136,13 +136,40 @@ class StorageManager {
       created: session.created,
       lastAccessed: session.lastAccessed,
       tabCount: session.tabCount,
-      tabs: session.tabs.slice(0, 15).map(tab => ({ // Limit to 15 tabs per session for sync
+      windowCount: session.windowCount,
+      // Preserve window data if available, otherwise use legacy tabs format
+      windows: session.windows ? session.windows.slice(0, 3).map(window => ({ // Limit to 3 windows per session
+        id: window.id,
+        left: window.left,
+        top: window.top,
+        width: window.width,
+        height: window.height,
+        state: window.state,
+        focused: window.focused,
+        incognito: window.incognito,
+        type: window.type,
+        tabs: window.tabs.slice(0, 8).map(tab => ({ // Limit to 8 tabs per window for sync
+          url: tab.url,
+          title: tab.title && tab.title.length > 60 ? tab.title.substring(0, 60) + '...' : (tab.title || 'Untitled'),
+          windowId: tab.windowId,
+          index: tab.index,
+          pinned: tab.pinned,
+          active: tab.active,
+          saved: tab.saved,
+          favIconUrl: tab.favIconUrl && tab.favIconUrl.startsWith('data:') ? null : tab.favIconUrl // Remove base64 favicons
+        }))
+      })) : undefined,
+      // Keep legacy tabs format for backward compatibility
+      tabs: session.tabs ? session.tabs.slice(0, 15).map(tab => ({ // Limit to 15 tabs per session for sync
         url: tab.url,
         title: tab.title && tab.title.length > 60 ? tab.title.substring(0, 60) + '...' : (tab.title || 'Untitled'),
         windowId: tab.windowId,
+        index: tab.index,
+        pinned: tab.pinned,
+        active: tab.active,
         saved: tab.saved,
         favIconUrl: tab.favIconUrl && tab.favIconUrl.startsWith('data:') ? null : tab.favIconUrl // Remove base64 favicons
-      }))
+      })) : []
     }));
   }
   
@@ -352,10 +379,34 @@ class StorageManager {
     for (const session of sessions) {
       const folderTitle = `${session.name || 'Session'} [${session.id || ''}]`;
       const sessionFolder = await chrome.bookmarks.create({ parentId: backupId, title: folderTitle });
-      const tabs = session.tabs || [];
-      for (const t of tabs) {
-        if (t?.url) {
-          await chrome.bookmarks.create({ parentId: sessionFolder.id, title: t.title || t.url, url: t.url });
+      
+      // Handle sessions with window data
+      if (session.windows && session.windows.length > 0) {
+        for (let i = 0; i < session.windows.length; i++) {
+          const window = session.windows[i];
+          const windowFolder = session.windows.length > 1 ? 
+            await chrome.bookmarks.create({ 
+              parentId: sessionFolder.id, 
+              title: `Window ${i + 1} (${window.tabs.length} tabs)` 
+            }) : sessionFolder;
+            
+          for (const tab of window.tabs || []) {
+            if (tab?.url) {
+              await chrome.bookmarks.create({ 
+                parentId: windowFolder.id, 
+                title: tab.title || tab.url, 
+                url: tab.url 
+              });
+            }
+          }
+        }
+      } else {
+        // Handle legacy sessions with just tabs
+        const tabs = session.tabs || [];
+        for (const t of tabs) {
+          if (t?.url) {
+            await chrome.bookmarks.create({ parentId: sessionFolder.id, title: t.title || t.url, url: t.url });
+          }
         }
       }
     }
