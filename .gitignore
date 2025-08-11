@@ -1,3 +1,7 @@
+# Project specific files
+omni.pem
+omni.crx
+
 # Logs
 # logs
 *.log
@@ -137,3 +141,6 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Temporary files
+tmp/

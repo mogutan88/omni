@@ -19,6 +19,12 @@ class StorageManager {
 
   async initialize() {
     await this.migrateLocalSessions();
+    // Best-effort: if storage is empty, try recovering from bookmarks backup
+    try {
+      await this.tryBookmarksRecoveryIfEmpty();
+    } catch (e) {
+      // ignore recovery errors
+    }
   }
 
   async getSessions() {
@@ -100,6 +106,20 @@ class StorageManager {
       } else if (!syncSuccess) {
         console.warn('⚠️ Sessions saved to local storage only - sync storage failed');
         console.warn('⚠️ Sessions may not sync across devices or persist perfectly');
+      }
+
+      // Optional bookmark backup that survives uninstall (controlled by settings)
+      try {
+        const { settings } = await chrome.storage.local.get(['settings']);
+        const enableBackup = settings?.bookmarksBackup !== false; // default ON
+        if (enableBackup) {
+          await this.backupSessionsToBookmarks(sessions);
+          console.log('✅ Sessions backed up to bookmarks');
+        } else {
+          console.log('ℹ️ Bookmarks backup disabled in settings');
+        }
+      } catch (bmError) {
+        console.warn('⚠️ Failed to backup sessions to bookmarks (permission missing or other error):', bmError);
       }
       
     } catch (error) {
@@ -272,6 +292,138 @@ class StorageManager {
 
   async saveSuspendedTabs(suspendedTabs) {
     await chrome.storage.local.set({ suspendedTabs });
+  }
+
+  // ============ Bookmarks Backup/Recovery ============
+  async ensureBookmarksRoot() {
+    const ROOT_TITLE = 'Omni Sessions';
+    // Try to find existing root folder
+    const found = await chrome.bookmarks.search({ title: ROOT_TITLE });
+    const existingFolder = (found || []).find(n => !n.url && n.title === ROOT_TITLE);
+    if (existingFolder) return existingFolder.id;
+
+    // Find a reasonable parent folder under the real roots (never use the absolute root id)
+    const tree = await chrome.bookmarks.getTree();
+    const root = tree[0];
+    const folders = (root.children || []).filter(n => !n.url);
+
+    // Prefer known root folders by ID regardless of locale: '2' (Other), '1' (Bookmarks Bar), '3' (Mobile)
+    const other = folders.find(n => n.id === '2');
+    const bar = folders.find(n => n.id === '1');
+    const mobile = folders.find(n => n.id === '3');
+    const fallback = folders[0];
+
+    const parentId = (other || bar || mobile || fallback)?.id;
+    if (!parentId || parentId === root.id) {
+      throw new Error('No valid bookmarks parent folder found');
+    }
+
+    const created = await chrome.bookmarks.create({ parentId, title: ROOT_TITLE });
+    return created.id;
+  }
+
+  async ensureAutoBackupFolder(rootId) {
+    const AUTO_BACKUP_TITLE = 'Auto Backup';
+    const children = await chrome.bookmarks.getChildren(rootId);
+    let folder = (children || []).find(n => !n.url && n.title === AUTO_BACKUP_TITLE);
+    if (folder) return folder.id;
+    const created = await chrome.bookmarks.create({ parentId: rootId, title: AUTO_BACKUP_TITLE });
+    return created.id;
+  }
+
+  async clearFolderChildren(folderId) {
+    const kids = await chrome.bookmarks.getChildren(folderId);
+    for (const k of kids || []) {
+      if (!k.url) {
+        await chrome.bookmarks.removeTree(k.id);
+      } else {
+        await chrome.bookmarks.remove(k.id);
+      }
+    }
+  }
+
+  async backupSessionsToBookmarks(sessions) {
+    // No-op if API not available
+    if (!chrome.bookmarks?.create) return;
+    const rootId = await this.ensureBookmarksRoot();
+    const backupId = await this.ensureAutoBackupFolder(rootId);
+    await this.clearFolderChildren(backupId);
+
+    for (const session of sessions) {
+      const folderTitle = `${session.name || 'Session'} [${session.id || ''}]`;
+      const sessionFolder = await chrome.bookmarks.create({ parentId: backupId, title: folderTitle });
+      const tabs = session.tabs || [];
+      for (const t of tabs) {
+        if (t?.url) {
+          await chrome.bookmarks.create({ parentId: sessionFolder.id, title: t.title || t.url, url: t.url });
+        }
+      }
+    }
+  }
+
+  async tryBookmarksRecoveryIfEmpty() {
+    // Skip if bookmarks API unavailable
+    if (!chrome.bookmarks?.getChildren) return { recovered: false, recoveredCount: 0 };
+    const existing = await chrome.storage.sync.get(['sessions']);
+    if (existing.sessions && existing.sessions.length > 0) {
+      return { recovered: false, recoveredCount: 0 };
+    }
+
+    // Try reading from Auto Backup
+    const rootId = await this.ensureBookmarksRoot().catch(() => null);
+    if (!rootId) return { recovered: false, recoveredCount: 0 };
+    const children = await chrome.bookmarks.getChildren(rootId);
+    const backupFolder = (children || []).find(n => !n.url && n.title === 'Auto Backup');
+    if (!backupFolder) return { recovered: false, recoveredCount: 0 };
+
+    const sessionFolders = await chrome.bookmarks.getChildren(backupFolder.id);
+    const recoveredSessions = [];
+    for (const sf of sessionFolders || []) {
+      if (sf.url) continue; // skip bookmarks at this level
+      const tabNodes = await chrome.bookmarks.getChildren(sf.id);
+      const tabs = (tabNodes || []).filter(n => n.url).map(n => ({
+        url: n.url,
+        title: n.title,
+        saved: Date.now()
+      }));
+      if (tabs.length === 0) continue;
+
+      // Extract id from folder title if present: "... [id]"
+      const idMatch = /\[(.*?)\]$/.exec(sf.title || '');
+      const recoveredId = idMatch?.[1] || `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const name = (sf.title || '').replace(/\s*\[.*?\]$/, '') || 'Recovered Session';
+      recoveredSessions.push({
+        id: recoveredId,
+        name,
+        tabs,
+        tabCount: tabs.length,
+        created: Date.now(),
+        lastAccessed: Date.now()
+      });
+    }
+
+    if (recoveredSessions.length > 0) {
+      await this.saveSessions(recoveredSessions);
+      return { recovered: true, recoveredCount: recoveredSessions.length };
+    }
+    return { recovered: false, recoveredCount: 0 };
+  }
+
+  async cleanBookmarksBackup() {
+    if (!chrome.bookmarks?.removeTree) {
+      return { deleted: false, reason: 'bookmarks_api_unavailable' };
+    }
+    try {
+      const rootId = await this.ensureBookmarksRoot().catch(() => null);
+      if (!rootId) return { deleted: false, reason: 'root_not_found' };
+      const children = await chrome.bookmarks.getChildren(rootId);
+      const backupFolder = (children || []).find(n => !n.url && n.title === 'Auto Backup');
+      if (!backupFolder) return { deleted: false, reason: 'backup_folder_not_found' };
+      await chrome.bookmarks.removeTree(backupFolder.id);
+      return { deleted: true };
+    } catch (e) {
+      return { deleted: false, reason: e?.message || 'unknown_error' };
+    }
   }
 }
 

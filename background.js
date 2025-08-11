@@ -13,6 +13,18 @@ class OmniBackground {
       this.handleCommand(command);
     });
 
+    // Attempt recovery from bookmarks on install/update if needed
+    chrome.runtime.onInstalled.addListener(async (details) => {
+      try {
+        const sessions = await this.storageManager.getSessions();
+        if (!sessions || sessions.length === 0) {
+          await this.storageManager.tryBookmarksRecoveryIfEmpty?.();
+        }
+      } catch (e) {
+        // best-effort recovery
+      }
+    });
+
     // Tab lifecycle events
     chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
       this.handleTabRemoved(tabId);

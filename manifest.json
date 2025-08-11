@@ -2,13 +2,15 @@
   "manifest_version": 3,
   "name": "Omni Tab Manager",
   "version": "1.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtbs6hLUSyrfc/ZNmHwDVoV7NZTRk0u2R3YzLOIo2DU9JQETXhdLLJXYsQR4ZRnE+uvKKQDOH6cS7iWWBfDPa26nsPYa2hHMJXvt5ZaHeAlJvkOcvDZfgYNbyORO4ooYbQK0SdPT2gjdG/JiOoE2cn+L6ImmD4p16ZeyxfpDznFySMFTTIOjZOeGj5gcq9IZzWu4yDZbvHKB6O0RuBJyl8HuzX1g/46RBwKHlu0f4BXgibh0qx9gOGHjiD9W1F9UhwT/VjjPTa0r/sstw8yuByPp+cT4HBvv726qnF/mEqsczMTcaKSM+tJK8fpALiGIGzfvBqAGQYcIbISyZjldWWQIDAQAB",
   "description": "Ultimate tab management and workspace organization solution",
   "permissions": [
     "tabs",
     "storage",
     "activeTab",
     "tabGroups",
-    "favicon"
+    "favicon",
+    "bookmarks"
   ],
   "background": {
     "service_worker": "background.js"

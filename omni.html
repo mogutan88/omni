@@ -423,9 +423,21 @@
                         <div class="settings-section">
                             <h3>Data & Privacy</h3>
                             <div class="setting-item">
+                                <label class="setting-label">
+                                    <span>Bookmarks backup</span>
+                                    <input type="checkbox" id="bookmarksBackup" class="toggle-switch" checked>
+                                </label>
+                                <p class="setting-description">Backup sessions to Bookmarks (survives uninstall/reinstall)</p>
+                                <p class="setting-description">Backups are stored under Bookmarks &gt; Omni Sessions &gt; Auto Backup</p>
+                            </div>
+                            <div class="setting-item">
                                 <button class="btn btn-secondary" id="exportSessionsBtn">Export Sessions</button>
                                 <button class="btn btn-secondary" id="importSessionsBtn">Import Sessions</button>
                                 <input type="file" id="importFileInput" accept=".json" style="display: none;">
+                            </div>
+                            <div class="setting-item">
+                                <button class="btn btn-secondary" id="cleanBackupsBtn">Clean Backups</button>
+                                <p class="setting-description">Remove the Auto Backup folder under Omni Sessions</p>
                             </div>
                             <p class="setting-description">Export your sessions as a JSON file for backup. Useful when developing extensions (unpacked mode).</p>
                             <div class="setting-item">

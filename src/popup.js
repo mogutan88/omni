@@ -963,6 +963,22 @@ class OmniPopup {
     }
   }
 
+  showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+      <span class="toast-icon">${type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ'}</span>
+      <span class="toast-message">${message}</span>
+    `;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.animation = 'slideOut 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
   setupDevelopmentEventListeners() {
     // Only set up once
     if (this.devListenersSetup) return;
@@ -987,6 +1003,24 @@ class OmniPopup {
     // Handle session import file
     document.getElementById('importSessionsFile')?.addEventListener('change', (e) => {
       this.handleSessionImportFile(e);
+    });
+
+    // Clean bookmarks backups (Dev tab)
+    document.getElementById('cleanBackupsDev')?.addEventListener('click', async () => {
+      if (!confirm('Remove the bookmarks backup folder (Auto Backup) under Omni Sessions?')) return;
+      try {
+        const result = await this.storageManager.cleanBookmarksBackup();
+        if (result.deleted) {
+          this.logToConsole('info', 'Bookmarks backups cleaned');
+          this.showToast('Bookmarks backups cleaned', 'success');
+        } else {
+          this.logToConsole('info', 'No backups found to clean');
+          this.showToast('No backups found to clean', 'info');
+        }
+      } catch (e) {
+        this.logToConsole('error', `Failed to clean backups: ${e?.message || e}`);
+        this.showToast('Failed to clean backups', 'error');
+      }
     });
 
     // Export data

@@ -201,6 +201,10 @@
                             <span class="icon">📥</span>
                             Import Sessions
                         </button>
+                        <button id="cleanBackupsDev" class="action-btn">
+                            <span class="icon">🧹</span>
+                            Clean Backups
+                        </button>
                         <input type="file" id="importSessionsFile" accept=".json" style="display: none;">
                     </div>
                     <p class="dev-note">💡 Use these to backup sessions before reloading unpacked extensions</p>
@@ -332,6 +336,9 @@
     <div id="loadingSpinner" class="loading-spinner hidden">
         <div class="spinner"></div>
     </div>
+
+    <!-- Toasts -->
+    <div id="toastContainer" class="toast-container"></div>
 
     <!-- Scripts -->
     <script src="src/storage-manager.js"></script>

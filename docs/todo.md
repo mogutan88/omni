@@ -103,6 +103,7 @@
 - [ ] Quick actions menu
 - [ ] Context menus for tabs/sessions
 - [ ] Tab statistics and analytics
+- [x] Bookmarks backup/restore to survive uninstall
 
 ## Phase 3 (Advanced Features) - Status: 📋 PENDING
 
@@ -173,6 +174,7 @@
 - [x] Console output capture
 - [x] Diagnostic tools
 - [x] Test data generation
+- [x] Stable extension ID for dev via manifest `key`
 - [ ] Integration APIs
 - [ ] Plugin system
 - [ ] Webhook support

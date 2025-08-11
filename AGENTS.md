@@ -15,6 +15,8 @@ MANDATORY LOGGING RULE: After completing any significant work session or task, t
 
 ## Session [N] - [Time Range]
 
+### Worker Agent [Agent Name]
+
 ### User Request:
 Request Datetime: yyyy-MM-dd hh:mm:ss
 

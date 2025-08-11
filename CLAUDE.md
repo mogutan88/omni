@@ -15,6 +15,8 @@ Omni is a comprehensive browser extension that combines the best features from l
 
 ## Session [N] - [Time Range]
 
+### Worker Agent [Agent Name]
+
 ### User Request:
 Request Datetime: yyyy-MM-dd hh:mm:ss
 

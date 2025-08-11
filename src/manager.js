@@ -18,6 +18,7 @@ class OmniManager {
       await this.initializeManagers();
       this.setupEventListeners();
       this.setupMessageListeners();
+      await this.loadSettings();
       this.loadOverview();
       this.updateSidebarBadges();
       
@@ -217,6 +218,22 @@ class OmniManager {
     // Clear all data
     document.getElementById('clearAllDataBtn')?.addEventListener('click', () => {
       this.clearAllData();
+    });
+
+    // Clean bookmarks backups
+    document.getElementById('cleanBackupsBtn')?.addEventListener('click', async () => {
+      if (!confirm('Remove the bookmarks backup folder (Auto Backup) under Omni Sessions?')) return;
+      try {
+        const result = await this.storageManager.cleanBookmarksBackup();
+        if (result.deleted) {
+          this.showToast('Bookmarks backups cleaned', 'success');
+        } else {
+          this.showToast('No backups found to clean', 'info');
+        }
+      } catch (e) {
+        console.error('Error cleaning bookmarks backups:', e);
+        this.showToast('Failed to clean backups', 'error');
+      }
     });
   }
 
@@ -811,15 +828,42 @@ class OmniManager {
     }
   }
 
+  async loadSettings() {
+    try {
+      const { settings } = await chrome.storage.local.get(['settings']);
+      const bookmarksBackup = settings?.bookmarksBackup !== false; // default ON
+      const bbEl = document.getElementById('bookmarksBackup');
+      if (bbEl) bbEl.checked = bookmarksBackup;
+    } catch (e) {
+      // ignore
+    }
+  }
+
   async saveSettings() {
-    // Implement settings save
-    this.showToast('Settings saved', 'success');
+    try {
+      const { settings: existing } = await chrome.storage.local.get(['settings']);
+      const updated = { ...(existing || {}) };
+      const bbEl = document.getElementById('bookmarksBackup');
+      if (bbEl) updated.bookmarksBackup = !!bbEl.checked;
+      await chrome.storage.local.set({ settings: updated });
+      this.showToast('Settings saved', 'success');
+    } catch (e) {
+      console.error('Error saving settings:', e);
+      this.showToast('Failed to save settings', 'error');
+    }
   }
 
   async resetSettings() {
     if (!confirm('Reset all settings to defaults?')) return;
-    // Implement settings reset
-    this.showToast('Settings reset', 'success');
+    try {
+      const defaults = { bookmarksBackup: true };
+      await chrome.storage.local.set({ settings: defaults });
+      await this.loadSettings();
+      this.showToast('Settings reset', 'success');
+    } catch (e) {
+      console.error('Error resetting settings:', e);
+      this.showToast('Failed to reset settings', 'error');
+    }
   }
 
   async exportData() {
