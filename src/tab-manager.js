@@ -204,13 +204,36 @@ class TabManager {
     try {
       const suspendedTab = this.suspendedTabs.get(uniqueId);
       if (!suspendedTab) {
+        console.error('No suspended tab found for uniqueId:', uniqueId);
         return false;
       }
 
-      const currentTab = await chrome.tabs.getCurrent();
-      const tabId = currentTab ? currentTab.id : suspendedTab.id;
+      const allTabs = await chrome.tabs.query({});
+      const suspendedHtmlUrl = chrome.runtime.getURL(`suspended.html?uniqueId=${uniqueId}`);
+      
+      let targetTab = null;
+      
+      targetTab = allTabs.find(tab => tab.url === suspendedHtmlUrl);
+      
+      if (!targetTab) {
+        const suspendedUrlPattern = chrome.runtime.getURL('suspended.html');
+        targetTab = allTabs.find(tab => 
+          tab.url.startsWith(suspendedUrlPattern) && 
+          tab.url.includes(`uniqueId=${uniqueId}`)
+        );
+      }
+      
+      if (!targetTab) {
+        targetTab = allTabs.find(tab => tab.id === suspendedTab.id);
+      }
 
-      await chrome.tabs.update(tabId, { url: suspendedTab.url });
+      if (!targetTab) {
+        console.error('Could not find suspended tab to restore for uniqueId:', uniqueId);
+        return false;
+      }
+
+      console.log('Restoring tab:', targetTab.id, 'to URL:', suspendedTab.url);
+      await chrome.tabs.update(targetTab.id, { url: suspendedTab.url });
       this.suspendedTabs.delete(uniqueId);
       await this.saveSuspendedTabs();
 
