@@ -5,6 +5,7 @@ class OmniManager {
     this.searchManager = null;
     this.storageManager = new StorageManager();
     this.sidebarCollapsed = false;
+    this.currentTabFilter = 'all'; // Initialize filter to 'all'
     
     this.initialize();
   }
@@ -453,13 +454,30 @@ class OmniManager {
 
   async loadTabs() {
     try {
-      const tabs = await this.tabManager.getAllTabs();
+      let tabs = await this.tabManager.getAllTabs();
       const container = document.getElementById('tabsContainer');
       
-      // Update stats
-      document.getElementById('totalTabCount').textContent = tabs.length;
-      document.getElementById('activeTabCount').textContent = tabs.filter(t => !t.suspended).length;
-      document.getElementById('suspendedTabCount').textContent = tabs.filter(t => t.suspended).length;
+      // Apply filter if one is active
+      if (this.currentTabFilter && this.currentTabFilter !== 'all') {
+        switch (this.currentTabFilter) {
+          case 'active':
+            tabs = tabs.filter(t => !t.suspended);
+            break;
+          case 'suspended':
+            tabs = tabs.filter(t => t.suspended);
+            break;
+          case 'grouped':
+            // Filter tabs that are in tab groups (Chrome tab groups)
+            tabs = tabs.filter(t => t.groupId && t.groupId !== -1);
+            break;
+        }
+      }
+      
+      // Update stats (always show total counts, not filtered)
+      const allTabs = await this.tabManager.getAllTabs();
+      document.getElementById('totalTabCount').textContent = allTabs.length;
+      document.getElementById('activeTabCount').textContent = allTabs.filter(t => !t.suspended).length;
+      document.getElementById('suspendedTabCount').textContent = allTabs.filter(t => t.suspended).length;
 
       // Group tabs by window
       const tabsByWindow = {};
@@ -470,7 +488,16 @@ class OmniManager {
         tabsByWindow[tab.windowId].push(tab);
       });
 
-      // Render tabs
+      // Render tabs or show empty state
+      if (tabs.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <p>No tabs match the selected filter</p>
+          </div>
+        `;
+        return;
+      }
+      
       container.innerHTML = Object.entries(tabsByWindow).map(([windowId, windowTabs]) => `
         <div class="tab-group">
           <div class="tab-group-header">
@@ -1015,8 +1042,10 @@ class OmniManager {
     }
   }
 
-  filterTabs(_filter) {
-    // Implement tab filtering
+  filterTabs(filter) {
+    // Store the current filter
+    this.currentTabFilter = filter;
+    // Reload tabs with the filter applied
     this.loadTabs();
   }
 
