@@ -23,8 +23,7 @@ class SuspendedPage {
             const suspendedTabs = data.suspendedTabs || [];
             
             this.suspendedTab = suspendedTabs.find(tab => 
-                tab.uniqueId === this.uniqueId || 
-                (tab.id && tab.id.toString() === this.uniqueId)
+                tab.uniqueId === this.uniqueId
             );
 
             if (this.suspendedTab) {
@@ -68,6 +67,8 @@ class SuspendedPage {
         }
 
         try {
+            // chrome.tabs.getCurrent() can return undefined in certain contexts (e.g., when called from a popup or background script).
+            // In such cases, we create a new tab as a fallback.
             const currentTab = await chrome.tabs.getCurrent();
             if (!currentTab) {
                 await chrome.tabs.create({ url: this.suspendedTab.url });
@@ -79,13 +80,9 @@ class SuspendedPage {
 
             const data = await chrome.storage.local.get(['suspendedTabs']);
             const suspendedTabs = data.suspendedTabs || [];
-            const updatedTabs = suspendedTabs.filter(tab => {
-                if (this.suspendedTab.uniqueId) {
-                    return tab.uniqueId !== this.suspendedTab.uniqueId;
-                } else {
-                    return tab.id !== this.suspendedTab.id;
-                }
-            });
+            const updatedTabs = suspendedTabs.filter(tab => 
+                tab.uniqueId !== this.suspendedTab.uniqueId
+            );
             await chrome.storage.local.set({ suspendedTabs: updatedTabs });
 
         } catch (error) {

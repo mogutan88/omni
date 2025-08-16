@@ -353,7 +353,17 @@ class OmniPopup {
           </div>
           <div class="tab-list">
             ${windowTabs.map(tab => {
-              const tabIdentifier = tab.uniqueId ? tab.uniqueId : tab.id;
+              let tabIdentifier;
+              if (tab.suspended) {
+                if (tab.uniqueId) {
+                  tabIdentifier = tab.uniqueId;
+                } else {
+                  console.warn(`Suspended tab is missing uniqueId. Falling back to tab.id. This may cause issues with tab ID reuse. Tab:`, tab);
+                  tabIdentifier = tab.id;
+                }
+              } else {
+                tabIdentifier = tab.uniqueId ? tab.uniqueId : tab.id;
+              }
               return `
               <div class="tab-item" data-tab-id="${tabIdentifier}">
                 <img class="item-icon favicon-img" src="${this.getFaviconUrl(tab)}" alt="">

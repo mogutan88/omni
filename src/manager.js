@@ -1122,7 +1122,17 @@ class OmniManager {
   }
 
   renderTabItem(tab, isSuspended = false) {
-    const tabIdentifier = tab.uniqueId ? tab.uniqueId : tab.id;
+    let tabIdentifier;
+    if (isSuspended) {
+      if (tab.uniqueId) {
+        tabIdentifier = tab.uniqueId;
+      } else {
+        console.warn(`Suspended tab is missing uniqueId. Falling back to tab.id. This may cause issues with tab ID reuse. Tab:`, tab);
+        tabIdentifier = tab.id;
+      }
+    } else {
+      tabIdentifier = tab.uniqueId ? tab.uniqueId : tab.id;
+    }
     return `
       <div class="tab-item ${isSuspended ? 'suspended' : ''}" data-tab-id="${tabIdentifier}" data-suspended="${isSuspended}">
         <img class="tab-favicon favicon-img" src="${this.getFaviconUrl(tab)}" alt="">

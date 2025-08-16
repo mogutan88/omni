@@ -12,7 +12,7 @@ class TabManager {
     
     if (data.suspendedTabs) {
       data.suspendedTabs.forEach(tab => {
-        if (!tab.uniqueId) {
+        if (!tab.uniqueId || typeof tab.uniqueId !== 'string' || tab.uniqueId.trim() === '') {
           tab.uniqueId = crypto.randomUUID();
         }
         this.suspendedTabs.set(tab.uniqueId, tab);
@@ -273,7 +273,7 @@ class TabManager {
       const totalTabs = windowsData.reduce((sum, window) => sum + window.tabs.length, 0);
       
       const session = {
-        id: `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+        id: `session_${crypto.randomUUID()}`,
         name: sessionName,
         windows: windowsData,
         tabs: windowsData.flatMap(w => w.tabs), // For backward compatibility
