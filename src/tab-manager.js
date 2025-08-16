@@ -24,6 +24,8 @@ class TabManager {
     // Migrate any existing local sessions to sync storage
     await this.storageManager.migrateLocalSessions();
 
+    await this.cleanupOrphanedSuspensions();
+
     if (this.settings.suspendInactive) {
       this.startInactiveTabSuspension();
     }
