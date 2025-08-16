@@ -185,14 +185,14 @@
     <script>
         class SuspendedPage {
             constructor() {
-                this.tabId = this.getTabIdFromUrl();
+                this.uniqueId = this.getUniqueIdFromUrl();
                 this.suspendedTab = null;
                 this.initialize();
             }
 
-            getTabIdFromUrl() {
+            getUniqueIdFromUrl() {
                 const urlParams = new URLSearchParams(window.location.search);
-                return urlParams.get('id');
+                return urlParams.get('uniqueId') || urlParams.get('id');
             }
 
             async initialize() {
@@ -206,7 +206,11 @@
                 try {
                     const data = await chrome.storage.local.get(['suspendedTabs']);
                     const suspendedTabs = data.suspendedTabs || [];
-                    this.suspendedTab = suspendedTabs.find(tab => tab.id.toString() === this.tabId);
+                    
+                    this.suspendedTab = suspendedTabs.find(tab => 
+                        tab.uniqueId === this.uniqueId || 
+                        (tab.id && tab.id.toString() === this.uniqueId)
+                    );
 
                     if (this.suspendedTab) {
                         document.getElementById('tabTitle').textContent = this.suspendedTab.title;
@@ -250,15 +254,18 @@
                 }
 
                 try {
-                    // Update the current tab to the original URL
-                    await chrome.tabs.update(parseInt(this.tabId), { 
+                    const currentTab = await chrome.tabs.getCurrent();
+                    await chrome.tabs.update(currentTab.id, { 
                         url: this.suspendedTab.url 
                     });
 
-                    // Remove from suspended tabs list
+                    // Remove from suspended tabs list using unique ID
                     const data = await chrome.storage.local.get(['suspendedTabs']);
                     const suspendedTabs = data.suspendedTabs || [];
-                    const updatedTabs = suspendedTabs.filter(tab => tab.id.toString() !== this.tabId);
+                    const updatedTabs = suspendedTabs.filter(tab => 
+                        tab.uniqueId !== this.suspendedTab.uniqueId &&
+                        tab.id !== this.suspendedTab.id
+                    );
                     await chrome.storage.local.set({ suspendedTabs: updatedTabs });
 
                 } catch (error) {

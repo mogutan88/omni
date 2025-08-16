@@ -263,16 +263,16 @@ class OmniManager {
       // Handle tab action button clicks
       const tabActionButton = e.target.closest('.btn-icon[data-tab-id]');
       if (tabActionButton) {
-        const tabId = parseInt(tabActionButton.dataset.tabId);
+        const tabIdentifier = tabActionButton.dataset.tabId;
         
         if (tabActionButton.classList.contains('tab-action-switch')) {
-          this.switchToTab(tabId);
+          this.switchToTab(parseInt(tabIdentifier));
         } else if (tabActionButton.classList.contains('tab-action-restore')) {
-          this.restoreTab(tabId);
+          this.restoreTab(tabIdentifier);
         } else if (tabActionButton.classList.contains('tab-action-suspend')) {
-          this.suspendTab(tabId);
+          this.suspendTab(parseInt(tabIdentifier));
         } else if (tabActionButton.classList.contains('tab-action-close')) {
-          this.closeTab(tabId);
+          this.closeTab(parseInt(tabIdentifier));
         }
         return;
       }
@@ -791,14 +791,14 @@ class OmniManager {
     }
   }
 
-  async handleTabItemClick(tabId, isSuspended) {
+  async handleTabItemClick(tabIdentifier, isSuspended) {
     try {
       if (isSuspended) {
         // If tab is suspended, restore it (which will also switch to it)
-        await this.restoreTab(tabId);
+        await this.restoreTab(tabIdentifier);
       } else {
         // If tab is active, just switch to it
-        await this.switchToTab(tabId);
+        await this.switchToTab(parseInt(tabIdentifier));
       }
     } catch (error) {
       console.error('Error handling tab item click:', error);
@@ -815,16 +815,14 @@ class OmniManager {
     }
   }
 
-  async restoreTab(tabId) {
+  async restoreTab(uniqueId) {
     try {
-      await this.tabManager.restoreTab(tabId);
+      await this.tabManager.restoreTab(uniqueId);
       await this.loadTabs();
       this.showToast('Tab restored', 'success');
-      
-      // Switch to the restored tab
-      await this.switchToTab(tabId);
     } catch (error) {
       console.error('Error restoring tab:', error);
+      this.showToast('Error restoring tab', 'error');
     }
   }
 
@@ -1124,27 +1122,28 @@ class OmniManager {
   }
 
   renderTabItem(tab, isSuspended = false) {
+    const tabIdentifier = isSuspended && tab.uniqueId ? tab.uniqueId : tab.id;
     return `
-      <div class="tab-item ${isSuspended ? 'suspended' : ''}" data-tab-id="${tab.id}" data-suspended="${isSuspended}">
+      <div class="tab-item ${isSuspended ? 'suspended' : ''}" data-tab-id="${tabIdentifier}" data-suspended="${isSuspended}">
         <img class="tab-favicon favicon-img" src="${this.getFaviconUrl(tab)}" alt="">
         <div class="tab-content">
           <div class="tab-title">${this.escapeHtml(tab.title)}</div>
           <div class="tab-url">${this.escapeHtml(this.extractDomain(tab.url))}</div>
         </div>
         <div class="tab-actions">
-          <button class="btn-icon tab-action-switch" data-tab-id="${tab.id}" title="Switch to tab">
+          <button class="btn-icon tab-action-switch" data-tab-id="${tabIdentifier}" title="Switch to tab">
             <span class="icon">↗️</span>
           </button>
           ${isSuspended ? `
-            <button class="btn-icon tab-action-restore" data-tab-id="${tab.id}" title="Restore">
+            <button class="btn-icon tab-action-restore" data-tab-id="${tabIdentifier}" title="Restore">
               <span class="icon">▶️</span>
             </button>
           ` : `
-            <button class="btn-icon tab-action-suspend" data-tab-id="${tab.id}" title="Suspend">
+            <button class="btn-icon tab-action-suspend" data-tab-id="${tabIdentifier}" title="Suspend">
               <span class="icon">⏸️</span>
             </button>
           `}
-          <button class="btn-icon tab-action-close" data-tab-id="${tab.id}" title="Close">
+          <button class="btn-icon tab-action-close" data-tab-id="${tabIdentifier}" title="Close">
             <span class="icon">❌</span>
           </button>
         </div>

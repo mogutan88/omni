@@ -162,16 +162,16 @@ class OmniPopup {
       // Handle tab action buttons
       const tabActionButton = e.target.closest('.tab-action-switch, .tab-action-restore, .tab-action-suspend, .tab-action-close');
       if (tabActionButton) {
-        const tabId = parseInt(tabActionButton.dataset.tabId);
+        const tabIdentifier = tabActionButton.dataset.tabId;
         
         if (tabActionButton.classList.contains('tab-action-switch')) {
-          this.switchToTab(tabId);
+          this.switchToTab(parseInt(tabIdentifier));
         } else if (tabActionButton.classList.contains('tab-action-restore')) {
-          this.restoreTab(tabId);
+          this.restoreTab(tabIdentifier);
         } else if (tabActionButton.classList.contains('tab-action-suspend')) {
-          this.suspendTab(tabId);
+          this.suspendTab(parseInt(tabIdentifier));
         } else if (tabActionButton.classList.contains('tab-action-close')) {
-          this.closeTab(tabId);
+          this.closeTab(parseInt(tabIdentifier));
         }
         return;
       }
@@ -352,32 +352,35 @@ class OmniPopup {
             <span class="tab-count">${windowTabs.length} tabs</span>
           </div>
           <div class="tab-list">
-            ${windowTabs.map(tab => `
-              <div class="tab-item" data-tab-id="${tab.id}">
+            ${windowTabs.map(tab => {
+              const tabIdentifier = tab.suspended && tab.uniqueId ? tab.uniqueId : tab.id;
+              return `
+              <div class="tab-item" data-tab-id="${tabIdentifier}">
                 <img class="item-icon favicon-img" src="${this.getFaviconUrl(tab)}" alt="">
                 <div class="item-content">
                   <div class="item-title">${this.escapeHtml(tab.title)}</div>
                   <div class="item-subtitle">${this.escapeHtml(this.extractDomain(tab.url))}</div>
                 </div>
                 <div class="item-actions">
-                  <button class="item-action tab-action-switch" data-tab-id="${tab.id}" title="Switch to tab">
+                  <button class="item-action tab-action-switch" data-tab-id="${tabIdentifier}" title="Switch to tab">
                     ↗️
                   </button>
                   ${tab.suspended ? `
-                    <button class="item-action tab-action-restore" data-tab-id="${tab.id}" title="Restore">
+                    <button class="item-action tab-action-restore" data-tab-id="${tabIdentifier}" title="Restore">
                       ▶️
                     </button>
                   ` : `
-                    <button class="item-action tab-action-suspend" data-tab-id="${tab.id}" title="Suspend">
+                    <button class="item-action tab-action-suspend" data-tab-id="${tabIdentifier}" title="Suspend">
                       ⏸️
                     </button>
                   `}
-                  <button class="item-action tab-action-close" data-tab-id="${tab.id}" title="Close">
+                  <button class="item-action tab-action-close" data-tab-id="${tabIdentifier}" title="Close">
                     ❌
                   </button>
                 </div>
               </div>
-            `).join('')}
+            `;
+            }).join('')}
           </div>
         </div>
       `).join('');
@@ -805,24 +808,15 @@ class OmniPopup {
     }
   }
 
-  async restoreTab(tabId) {
+  async restoreTab(uniqueId) {
     try {
-      console.log('Attempting to restore tab:', tabId);
-      await this.tabManager.restoreTab(tabId);
+      console.log('Attempting to restore tab:', uniqueId);
+      await this.tabManager.restoreTab(uniqueId);
       console.log('Tab restored successfully');
       
-      // After restoring, switch to the tab like switchToTab does
-      await chrome.tabs.update(tabId, { active: true });
-      console.log('Tab activated successfully');
-      const tab = await chrome.tabs.get(tabId);
-      console.log('Got tab info:', tab);
-      await chrome.windows.update(tab.windowId, { focused: true });
-      console.log('Window focused successfully');
       window.close();
     } catch (error) {
       console.error('Error restoring tab:', error);
-      console.error('TabId was:', tabId, typeof tabId);
-      alert(`Failed to restore tab: ${error.message}`);
     }
   }
 
