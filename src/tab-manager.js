@@ -13,7 +13,8 @@ class TabManager {
     if (data.suspendedTabs) {
       data.suspendedTabs.forEach(tab => {
         if (!tab.uniqueId || typeof tab.uniqueId !== 'string' || tab.uniqueId.trim() === '') {
-          tab.uniqueId = crypto.randomUUID();
+          // Use traceable migration ID to maintain connection to original tab
+          tab.uniqueId = `${tab.id}-migration-${Date.now()}`;
         }
         this.suspendedTabs.set(tab.uniqueId, tab);
         this.suspendedTabIds.add(tab.id);
@@ -27,9 +28,10 @@ class TabManager {
 
     await this.cleanupOrphanedSuspensions();
 
-    if (this.settings.suspendInactive) {
-      this.startInactiveTabSuspension();
-    }
+    // TODO: Implement proper tab activity tracking before enabling automatic suspension
+    // if (this.settings.suspendInactive) {
+    //   this.startInactiveTabSuspension();
+    // }
   }
 
   async getAllTabs() {
@@ -212,18 +214,15 @@ class TabManager {
         return false;
       }
 
-      const suspendedHtmlUrl = chrome.runtime.getURL(`suspended.html?uniqueId=${uniqueId}`);
+      // Use pattern matching to find suspended tabs more efficiently
+      const suspendedUrlPattern = chrome.runtime.getURL('suspended.html') + '*';
+      const possibleTabs = await chrome.tabs.query({ url: suspendedUrlPattern });
       
-      // Query tabs with the exact suspended HTML URL
-      let tabs = await chrome.tabs.query({ url: suspendedHtmlUrl });
-      let targetTab = tabs.length > 0 ? tabs[0] : undefined;
-      
-      // Fallback: If not found, try to find by pattern (in case of query param order or other issues)
-      if (!targetTab) {
-        const suspendedUrlPattern = chrome.runtime.getURL('suspended.html') + '*';
-        const possibleTabs = await chrome.tabs.query({ url: suspendedUrlPattern });
-        targetTab = possibleTabs.find(tab => tab.url.includes(`uniqueId=${uniqueId}`));
-      }
+      // Find the specific tab by uniqueId parameter
+      const targetTab = possibleTabs.find(tab => {
+        const url = new URL(tab.url);
+        return url.searchParams.get('uniqueId') === uniqueId;
+      });
       
       if (!targetTab) {
         console.error('Could not find suspended tab to restore for uniqueId:', uniqueId);
@@ -440,7 +439,9 @@ class TabManager {
   }
 
   async getTabLastAccessed(_tabId) {
-    // TODO: Implement actual tab activity tracking
+    // TODO: Implement actual tab activity tracking using chrome.tabs.onActivated,
+    // chrome.tabs.onUpdated, and chrome.windows.onFocusChanged events
+    // For now, return current time to prevent automatic suspension
     return Date.now();
   }
 

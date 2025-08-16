@@ -1124,6 +1124,7 @@ class OmniManager {
   renderTabItem(tab, isSuspended = false) {
     let tabIdentifier;
     if (isSuspended) {
+      // Suspended tabs should always have uniqueId
       if (tab.uniqueId) {
         tabIdentifier = tab.uniqueId;
       } else {
@@ -1131,7 +1132,8 @@ class OmniManager {
         tabIdentifier = tab.id;
       }
     } else {
-      tabIdentifier = tab.uniqueId ? tab.uniqueId : tab.id;
+      // Regular Chrome tabs use numeric tab.id (they don't have uniqueId)
+      tabIdentifier = tab.id;
     }
     return `
       <div class="tab-item ${isSuspended ? 'suspended' : ''}" data-tab-id="${tabIdentifier}" data-suspended="${isSuspended}">

@@ -355,6 +355,7 @@ class OmniPopup {
             ${windowTabs.map(tab => {
               let tabIdentifier;
               if (tab.suspended) {
+                // Suspended tabs should always have uniqueId
                 if (tab.uniqueId) {
                   tabIdentifier = tab.uniqueId;
                 } else {
@@ -362,7 +363,8 @@ class OmniPopup {
                   tabIdentifier = tab.id;
                 }
               } else {
-                tabIdentifier = tab.uniqueId ? tab.uniqueId : tab.id;
+                // Regular Chrome tabs use numeric tab.id (they don't have uniqueId)
+                tabIdentifier = tab.id;
               }
               return `
               <div class="tab-item" data-tab-id="${tabIdentifier}">

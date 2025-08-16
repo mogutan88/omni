@@ -7,7 +7,21 @@ class SuspendedPage {
 
     getUniqueIdFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('uniqueId') || urlParams.get('id');
+        const uniqueId = urlParams.get('uniqueId');
+        
+        if (uniqueId) {
+            return uniqueId;
+        }
+        
+        // Migration fallback: convert legacy 'id' parameter to uniqueId format
+        const legacyId = urlParams.get('id');
+        if (legacyId) {
+            console.warn('Using legacy id parameter. This will be migrated to uniqueId format.');
+            return `${legacyId}-migration-${Date.now()}`;
+        }
+        
+        console.error('No uniqueId or id parameter found in URL');
+        return null;
     }
 
     async initialize() {
@@ -18,20 +32,39 @@ class SuspendedPage {
     }
 
     async loadSuspendedTabData() {
+        if (!this.uniqueId) {
+            document.getElementById('tabTitle').textContent = 'Invalid Tab';
+            document.getElementById('tabUrl').textContent = 'No valid tab identifier found';
+            return;
+        }
+
         try {
             const data = await chrome.storage.local.get(['suspendedTabs']);
             const suspendedTabs = data.suspendedTabs || [];
             
+            // First try exact uniqueId match
             this.suspendedTab = suspendedTabs.find(tab => 
                 tab.uniqueId === this.uniqueId
             );
+
+            // If not found and this looks like a migration ID, try original tab ID
+            if (!this.suspendedTab && this.uniqueId.includes('-migration-')) {
+                const originalTabId = this.uniqueId.split('-migration-')[0];
+                this.suspendedTab = suspendedTabs.find(tab => 
+                    tab.id === parseInt(originalTabId) && !tab.uniqueId
+                );
+                
+                if (this.suspendedTab) {
+                    console.log('Found suspended tab by legacy ID during migration');
+                }
+            }
 
             if (this.suspendedTab) {
                 document.getElementById('tabTitle').textContent = this.suspendedTab.title;
                 document.getElementById('tabUrl').textContent = this.suspendedTab.url;
             } else {
-                document.getElementById('tabTitle').textContent = 'Unknown Tab';
-                document.getElementById('tabUrl').textContent = 'Tab data not found';
+                document.getElementById('tabTitle').textContent = 'Tab Not Found';
+                document.getElementById('tabUrl').textContent = 'This suspended tab may have been cleaned up or restored';
             }
         } catch (error) {
             console.error('Error loading suspended tab data:', error);
