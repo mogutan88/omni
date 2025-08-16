@@ -510,4 +510,7 @@ class TabManager {
   }
 }
 
-window.TabManager = TabManager;
+// Make TabManager available globally in contexts that have window object
+if (typeof window !== 'undefined') {
+  window.TabManager = TabManager;
+}
