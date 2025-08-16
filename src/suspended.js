@@ -108,16 +108,33 @@ class SuspendedPage {
 
             if (!response || !response.success) {
                 console.error('Failed to restore tab:', response?.error);
-                // Fallback: create new tab with the original URL
-                await chrome.tabs.create({ url: this.suspendedTab.url });
+                // Fallback: update current tab with the original URL
+                try {
+                    const currentTab = await chrome.tabs.getCurrent();
+                    if (currentTab) {
+                        await chrome.tabs.update(currentTab.id, { url: this.suspendedTab.url });
+                    } else {
+                        // If getCurrent fails, create new tab as last resort
+                        await chrome.tabs.create({ url: this.suspendedTab.url });
+                    }
+                } catch (updateError) {
+                    console.error('Error updating current tab:', updateError);
+                    await chrome.tabs.create({ url: this.suspendedTab.url });
+                }
             }
         } catch (error) {
             console.error('Error sending restore message:', error);
-            // Fallback: create new tab with the original URL
+            // Fallback: update current tab with the original URL
             try {
-                await chrome.tabs.create({ url: this.suspendedTab.url });
-            } catch (createError) {
-                console.error('Error creating fallback tab:', createError);
+                const currentTab = await chrome.tabs.getCurrent();
+                if (currentTab) {
+                    await chrome.tabs.update(currentTab.id, { url: this.suspendedTab.url });
+                } else {
+                    // If getCurrent fails, create new tab as last resort
+                    await chrome.tabs.create({ url: this.suspendedTab.url });
+                }
+            } catch (fallbackError) {
+                console.error('Error in fallback restoration:', fallbackError);
                 alert('Unable to restore tab. Please try again.');
             }
         }
