@@ -353,7 +353,7 @@ class OmniPopup {
           </div>
           <div class="tab-list">
             ${windowTabs.map(tab => {
-              const tabIdentifier = tab.suspended && tab.uniqueId ? tab.uniqueId : tab.id;
+              const tabIdentifier = tab.uniqueId ? tab.uniqueId : tab.id;
               return `
               <div class="tab-item" data-tab-id="${tabIdentifier}">
                 <img class="item-icon favicon-img" src="${this.getFaviconUrl(tab)}" alt="">

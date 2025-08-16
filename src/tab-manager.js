@@ -3,7 +3,6 @@ class TabManager {
     this.suspendedTabs = new Map();
     this.suspendedTabIds = new Set();
     this.storageManager = new StorageManager();
-    this.uniqueIdCounter = 0;
     this.initializeTabSuspension();
   }
 
@@ -14,7 +13,7 @@ class TabManager {
     if (data.suspendedTabs) {
       data.suspendedTabs.forEach(tab => {
         if (!tab.uniqueId) {
-          tab.uniqueId = `${tab.id}-${Date.now()}-migration-${++this.uniqueIdCounter}`;
+          tab.uniqueId = crypto.randomUUID();
         }
         this.suspendedTabs.set(tab.uniqueId, tab);
         this.suspendedTabIds.add(tab.id);
@@ -177,7 +176,7 @@ class TabManager {
         return false;
       }
 
-      const uniqueId = `${tab.id}-${Date.now()}-${++this.uniqueIdCounter}`;
+      const uniqueId = crypto.randomUUID();
       
       const suspendedTab = {
         id: tab.id,
@@ -215,15 +214,17 @@ class TabManager {
 
       const suspendedHtmlUrl = chrome.runtime.getURL(`suspended.html?uniqueId=${uniqueId}`);
       
-      let [targetTab] = await chrome.tabs.query({ url: suspendedHtmlUrl });
+      // Query tabs with the exact suspended HTML URL
+      let tabs = await chrome.tabs.query({ url: suspendedHtmlUrl });
+      let targetTab = tabs.length > 0 ? tabs[0] : undefined;
       
+      // Fallback: If not found, try to find by pattern (in case of query param order or other issues)
       if (!targetTab) {
-        const suspendedUrlPattern = chrome.runtime.getURL('suspended.html');
-        const possibleTabs = await chrome.tabs.query({ url: suspendedUrlPattern + '*' });
+        const suspendedUrlPattern = chrome.runtime.getURL('suspended.html') + '*';
+        const possibleTabs = await chrome.tabs.query({ url: suspendedUrlPattern });
         targetTab = possibleTabs.find(tab => tab.url.includes(`uniqueId=${uniqueId}`));
       }
       
-
       if (!targetTab) {
         console.error('Could not find suspended tab to restore for uniqueId:', uniqueId);
         return false;
@@ -272,7 +273,7 @@ class TabManager {
       const totalTabs = windowsData.reduce((sum, window) => sum + window.tabs.length, 0);
       
       const session = {
-        id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
         name: sessionName,
         windows: windowsData,
         tabs: windowsData.flatMap(w => w.tabs), // For backward compatibility
@@ -438,7 +439,8 @@ class TabManager {
     }, 60000);
   }
 
-  async getTabLastAccessed(tabId) {
+  async getTabLastAccessed(_tabId) {
+    // TODO: Implement actual tab activity tracking
     return Date.now();
   }
 

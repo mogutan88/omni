@@ -1122,7 +1122,7 @@ class OmniManager {
   }
 
   renderTabItem(tab, isSuspended = false) {
-    const tabIdentifier = isSuspended && tab.uniqueId ? tab.uniqueId : tab.id;
+    const tabIdentifier = tab.uniqueId ? tab.uniqueId : tab.id;
     return `
       <div class="tab-item ${isSuspended ? 'suspended' : ''}" data-tab-id="${tabIdentifier}" data-suspended="${isSuspended}">
         <img class="tab-favicon favicon-img" src="${this.getFaviconUrl(tab)}" alt="">
