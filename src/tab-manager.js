@@ -223,9 +223,6 @@ class TabManager {
         );
       }
       
-      if (!targetTab) {
-        targetTab = allTabs.find(tab => tab.id === suspendedTab.id);
-      }
 
       if (!targetTab) {
         console.error('Could not find suspended tab to restore for uniqueId:', uniqueId);
@@ -478,14 +475,13 @@ class TabManager {
   }
 
   async cleanupOrphanedSuspensions() {
-    const allTabs = await chrome.tabs.query({});
-    const existingTabIds = new Set(allTabs.map(tab => tab.id));
-    
+    const now = Date.now();
+    const threshold = 30 * 24 * 60 * 60 * 1000; // 30 days
     let cleanedCount = 0;
     const toDelete = [];
     
     for (const [uniqueId, suspendedTab] of this.suspendedTabs.entries()) {
-      if (!existingTabIds.has(suspendedTab.id)) {
+      if (suspendedTab.suspended && (now - suspendedTab.suspended > threshold)) {
         toDelete.push(uniqueId);
         cleanedCount++;
       }
@@ -495,7 +491,7 @@ class TabManager {
     
     if (cleanedCount > 0) {
       await this.saveSuspendedTabs();
-      console.log(`Cleaned up ${cleanedCount} orphaned suspended tabs`);
+      console.log(`Cleaned up ${cleanedCount} old suspended tabs (older than 30 days)`);
     }
     
     return cleanedCount;

@@ -255,6 +255,11 @@
 
                 try {
                     const currentTab = await chrome.tabs.getCurrent();
+                    if (!currentTab) {
+                        // Fallback: try to navigate directly
+                        window.location.href = this.suspendedTab.url;
+                        return;
+                    }
                     await chrome.tabs.update(currentTab.id, { 
                         url: this.suspendedTab.url 
                     });
