@@ -441,7 +441,7 @@ class StorageManager {
 
       // Extract id from folder title if present: "... [id]"
       const idMatch = /\[(.*?)\]$/.exec(sf.title || '');
-      const recoveredId = idMatch?.[1] || `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const recoveredId = idMatch?.[1] || `session_${crypto.randomUUID()}`;
       const name = (sf.title || '').replace(/\s*\[.*?\]$/, '') || 'Recovered Session';
       recoveredSessions.push({
         id: recoveredId,

@@ -1,6 +1,7 @@
 class TabManager {
   constructor() {
     this.suspendedTabs = new Map();
+    this.suspendedTabIds = new Set();
     this.storageManager = new StorageManager();
     this.initializeTabSuspension();
   }
@@ -11,16 +12,26 @@ class TabManager {
     
     if (data.suspendedTabs) {
       data.suspendedTabs.forEach(tab => {
-        this.suspendedTabs.set(tab.id, tab);
+        if (!tab.uniqueId || typeof tab.uniqueId !== 'string' || tab.uniqueId.trim() === '') {
+          // Use unique migration ID to ensure no conflicts
+          tab.uniqueId = `migration-${crypto.randomUUID()}`;
+        }
+        this.suspendedTabs.set(tab.uniqueId, tab);
+        this.suspendedTabIds.add(tab.id);
       });
+      
+      await this.saveSuspendedTabs();
     }
 
     // Migrate any existing local sessions to sync storage
     await this.storageManager.migrateLocalSessions();
 
-    if (this.settings.suspendInactive) {
-      this.startInactiveTabSuspension();
-    }
+    await this.cleanupOrphanedSuspensions();
+
+    // TODO: Implement proper tab activity tracking before enabling automatic suspension
+    // if (this.settings.suspendInactive) {
+    //   this.startInactiveTabSuspension();
+    // }
   }
 
   async getAllTabs() {
@@ -35,7 +46,7 @@ class TabManager {
           allTabs.push({
             ...tab,
             windowId: window.id,
-            suspended: this.suspendedTabs.has(tab.id)
+            suspended: this.suspendedTabIds.has(tab.id)
           });
         }
       }
@@ -117,7 +128,7 @@ class TabManager {
       
       for (const window of windows) {
         const tabsToConvert = window.tabs.filter(tab => 
-          this.isUserTab(tab.url) && !this.suspendedTabs.has(tab.id)
+          this.isUserTab(tab.url) && !this.suspendedTabIds.has(tab.id)
         );
         
         if (tabsToConvert.length === 0) continue;
@@ -167,8 +178,11 @@ class TabManager {
         return false;
       }
 
+      const uniqueId = crypto.randomUUID();
+      
       const suspendedTab = {
         id: tab.id,
+        uniqueId: uniqueId,
         url: tab.url,
         title: tab.title,
         favIconUrl: tab.favIconUrl,
@@ -177,11 +191,12 @@ class TabManager {
         suspended: Date.now()
       };
 
-      this.suspendedTabs.set(tab.id, suspendedTab);
+      this.suspendedTabs.set(uniqueId, suspendedTab);
+      this.suspendedTabIds.add(tab.id);
       await this.saveSuspendedTabs();
 
       await chrome.tabs.update(tab.id, {
-        url: chrome.runtime.getURL(`suspended.html?id=${tab.id}`)
+        url: chrome.runtime.getURL(`suspended.html?uniqueId=${uniqueId}`)
       });
 
       return true;
@@ -191,15 +206,33 @@ class TabManager {
     }
   }
 
-  async restoreTab(tabId) {
+  async restoreTab(uniqueId) {
     try {
-      const suspendedTab = this.suspendedTabs.get(tabId);
+      const suspendedTab = this.suspendedTabs.get(uniqueId);
       if (!suspendedTab) {
+        console.error('No suspended tab found for uniqueId:', uniqueId);
         return false;
       }
 
-      await chrome.tabs.update(tabId, { url: suspendedTab.url });
-      this.suspendedTabs.delete(tabId);
+      // Use pattern matching to find suspended tabs more efficiently
+      const suspendedUrlPattern = chrome.runtime.getURL('suspended.html') + '*';
+      const possibleTabs = await chrome.tabs.query({ url: suspendedUrlPattern });
+      
+      // Find the specific tab by uniqueId parameter
+      const targetTab = possibleTabs.find(tab => {
+        const url = new URL(tab.url);
+        return url.searchParams.get('uniqueId') === uniqueId;
+      });
+      
+      if (!targetTab) {
+        console.error('Could not find suspended tab to restore for uniqueId:', uniqueId);
+        return false;
+      }
+
+      console.log('Restoring tab:', targetTab.id, 'to URL:', suspendedTab.url);
+      await chrome.tabs.update(targetTab.id, { url: suspendedTab.url });
+      this.suspendedTabs.delete(uniqueId);
+      this.suspendedTabIds.delete(suspendedTab.id);
       await this.saveSuspendedTabs();
 
       return true;
@@ -239,7 +272,7 @@ class TabManager {
       const totalTabs = windowsData.reduce((sum, window) => sum + window.tabs.length, 0);
       
       const session = {
-        id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `session_${crypto.randomUUID()}`,
         name: sessionName,
         windows: windowsData,
         tabs: windowsData.flatMap(w => w.tabs), // For backward compatibility
@@ -389,7 +422,7 @@ class TabManager {
         for (const tab of tabs) {
           if (tab.id !== activeTabId && 
               this.canSuspendTab(tab.url) &&
-              !this.suspendedTabs.has(tab.id)) {
+              !this.suspendedTabIds.has(tab.id)) {
             
             const lastAccessed = await this.getTabLastAccessed(tab.id);
             const now = Date.now();
@@ -405,7 +438,10 @@ class TabManager {
     }, 60000);
   }
 
-  async getTabLastAccessed(tabId) {
+  async getTabLastAccessed(_tabId) {
+    // TODO: Implement actual tab activity tracking using chrome.tabs.onActivated,
+    // chrome.tabs.onUpdated, and chrome.windows.onFocusChanged events
+    // For now, return current time to prevent automatic suspension
     return Date.now();
   }
 
@@ -440,6 +476,37 @@ class TabManager {
     }
 
     return results;
+  }
+
+  async cleanupOrphanedSuspensions() {
+    const now = Date.now();
+    const threshold = 30 * 24 * 60 * 60 * 1000; // 30 days
+    let cleanedCount = 0;
+    const toDelete = [];
+    
+    for (const [uniqueId, suspendedTab] of this.suspendedTabs.entries()) {
+      if (typeof suspendedTab.suspended === 'number' && 
+          Number.isFinite(suspendedTab.suspended) && 
+          (now - suspendedTab.suspended > threshold)) {
+        toDelete.push(uniqueId);
+        cleanedCount++;
+      }
+    }
+    
+    toDelete.forEach(uniqueId => {
+      const suspendedTab = this.suspendedTabs.get(uniqueId);
+      if (suspendedTab) {
+        this.suspendedTabIds.delete(suspendedTab.id);
+      }
+      this.suspendedTabs.delete(uniqueId);
+    });
+    
+    if (cleanedCount > 0) {
+      await this.saveSuspendedTabs();
+      console.log(`Cleaned up ${cleanedCount} old suspended tabs (older than 30 days)`);
+    }
+    
+    return cleanedCount;
   }
 }
 
