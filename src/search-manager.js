@@ -303,4 +303,7 @@ class SearchManager {
   }
 }
 
-window.SearchManager = SearchManager;
+// Make SearchManager available globally in contexts that have window object
+if (typeof window !== 'undefined') {
+  window.SearchManager = SearchManager;
+}
