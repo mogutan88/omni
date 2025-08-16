@@ -272,7 +272,7 @@ class TabManager {
       const totalTabs = windowsData.reduce((sum, window) => sum + window.tabs.length, 0);
       
       const session = {
-        id: `session_${crypto.randomUUID()}`,
+        id: `session_${Date.now()}`,
         name: sessionName,
         windows: windowsData,
         tabs: windowsData.flatMap(w => w.tabs), // For backward compatibility

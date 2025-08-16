@@ -1125,8 +1125,9 @@ class OmniManager {
     let tabIdentifier;
     if (isSuspended) {
       // Suspended tabs should always have uniqueId
-      if (tab.uniqueId) {
-        tabIdentifier = tab.uniqueId;
+      let uniqueId = tab.uniqueId || (tab.suspendedData && tab.suspendedData.uniqueId);
+      if (uniqueId) {
+        tabIdentifier = uniqueId;
       } else {
         console.warn(`Suspended tab is missing uniqueId. Falling back to tab.id. This may cause issues with tab ID reuse. Tab:`, tab);
         tabIdentifier = tab.id;

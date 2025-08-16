@@ -82,7 +82,7 @@ class OmniBackground {
 
   async saveSession(name, tabs) {
     const session = {
-      id: Date.now().toString(),
+      id: `session_${Date.now()}`,
       name: name || `Session ${new Date().toLocaleString()}`,
       tabs: tabs,
       created: Date.now(),

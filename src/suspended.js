@@ -17,7 +17,7 @@ class SuspendedPage {
         const legacyId = urlParams.get('id');
         if (legacyId) {
             console.warn('Using legacy id parameter. This will be migrated to uniqueId format.');
-            return `${legacyId}-migration-${Date.now()}`;
+            return `${parseInt(legacyId)}-migration-${Date.now()}`;
         }
         
         console.error('No uniqueId or id parameter found in URL');
