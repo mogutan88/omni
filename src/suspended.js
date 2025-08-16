@@ -70,7 +70,7 @@ class SuspendedPage {
         try {
             const currentTab = await chrome.tabs.getCurrent();
             if (!currentTab) {
-                window.location.href = this.suspendedTab.url;
+                await chrome.tabs.create({ url: this.suspendedTab.url });
                 return;
             }
             await chrome.tabs.update(currentTab.id, { 
@@ -79,15 +79,18 @@ class SuspendedPage {
 
             const data = await chrome.storage.local.get(['suspendedTabs']);
             const suspendedTabs = data.suspendedTabs || [];
-            const updatedTabs = suspendedTabs.filter(tab => 
-                tab.uniqueId !== this.suspendedTab.uniqueId &&
-                tab.id !== this.suspendedTab.id
-            );
+            const updatedTabs = suspendedTabs.filter(tab => {
+                if (this.suspendedTab.uniqueId) {
+                    return tab.uniqueId !== this.suspendedTab.uniqueId;
+                } else {
+                    return tab.id !== this.suspendedTab.id;
+                }
+            });
             await chrome.storage.local.set({ suspendedTabs: updatedTabs });
 
         } catch (error) {
             console.error('Error restoring tab:', error);
-            window.location.href = this.suspendedTab.url;
+            await chrome.tabs.create({ url: this.suspendedTab.url });
         }
     }
 

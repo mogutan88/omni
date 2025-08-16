@@ -1,6 +1,7 @@
 class TabManager {
   constructor() {
     this.suspendedTabs = new Map();
+    this.suspendedTabIds = new Set();
     this.storageManager = new StorageManager();
     this.uniqueIdCounter = 0;
     this.initializeTabSuspension();
@@ -16,6 +17,7 @@ class TabManager {
           tab.uniqueId = `${tab.id}-${Date.now()}-migration-${++this.uniqueIdCounter}`;
         }
         this.suspendedTabs.set(tab.uniqueId, tab);
+        this.suspendedTabIds.add(tab.id);
       });
       
       await this.saveSuspendedTabs();
@@ -43,7 +45,7 @@ class TabManager {
           allTabs.push({
             ...tab,
             windowId: window.id,
-            suspended: Array.from(this.suspendedTabs.values()).some(suspendedTab => suspendedTab.id === tab.id)
+            suspended: this.suspendedTabIds.has(tab.id)
           });
         }
       }
@@ -125,7 +127,7 @@ class TabManager {
       
       for (const window of windows) {
         const tabsToConvert = window.tabs.filter(tab => 
-          this.isUserTab(tab.url) && !Array.from(this.suspendedTabs.values()).some(suspendedTab => suspendedTab.id === tab.id)
+          this.isUserTab(tab.url) && !this.suspendedTabIds.has(tab.id)
         );
         
         if (tabsToConvert.length === 0) continue;
@@ -189,6 +191,7 @@ class TabManager {
       };
 
       this.suspendedTabs.set(uniqueId, suspendedTab);
+      this.suspendedTabIds.add(tab.id);
       await this.saveSuspendedTabs();
 
       await chrome.tabs.update(tab.id, {
@@ -210,19 +213,14 @@ class TabManager {
         return false;
       }
 
-      const allTabs = await chrome.tabs.query({});
       const suspendedHtmlUrl = chrome.runtime.getURL(`suspended.html?uniqueId=${uniqueId}`);
       
-      let targetTab = null;
-      
-      targetTab = allTabs.find(tab => tab.url === suspendedHtmlUrl);
+      let [targetTab] = await chrome.tabs.query({ url: suspendedHtmlUrl });
       
       if (!targetTab) {
         const suspendedUrlPattern = chrome.runtime.getURL('suspended.html');
-        targetTab = allTabs.find(tab => 
-          tab.url.startsWith(suspendedUrlPattern) && 
-          tab.url.includes(`uniqueId=${uniqueId}`)
-        );
+        const possibleTabs = await chrome.tabs.query({ url: suspendedUrlPattern + '*' });
+        targetTab = possibleTabs.find(tab => tab.url.includes(`uniqueId=${uniqueId}`));
       }
       
 
@@ -234,6 +232,7 @@ class TabManager {
       console.log('Restoring tab:', targetTab.id, 'to URL:', suspendedTab.url);
       await chrome.tabs.update(targetTab.id, { url: suspendedTab.url });
       this.suspendedTabs.delete(uniqueId);
+      this.suspendedTabIds.delete(suspendedTab.id);
       await this.saveSuspendedTabs();
 
       return true;
@@ -423,7 +422,7 @@ class TabManager {
         for (const tab of tabs) {
           if (tab.id !== activeTabId && 
               this.canSuspendTab(tab.url) &&
-              !Array.from(this.suspendedTabs.values()).some(suspendedTab => suspendedTab.id === tab.id)) {
+              !this.suspendedTabIds.has(tab.id)) {
             
             const lastAccessed = await this.getTabLastAccessed(tab.id);
             const now = Date.now();
@@ -483,13 +482,21 @@ class TabManager {
     const toDelete = [];
     
     for (const [uniqueId, suspendedTab] of this.suspendedTabs.entries()) {
-      if (suspendedTab.suspended && (now - suspendedTab.suspended > threshold)) {
+      if (typeof suspendedTab.suspended === 'number' && 
+          Number.isFinite(suspendedTab.suspended) && 
+          (now - suspendedTab.suspended > threshold)) {
         toDelete.push(uniqueId);
         cleanedCount++;
       }
     }
     
-    toDelete.forEach(uniqueId => this.suspendedTabs.delete(uniqueId));
+    toDelete.forEach(uniqueId => {
+      const suspendedTab = this.suspendedTabs.get(uniqueId);
+      if (suspendedTab) {
+        this.suspendedTabIds.delete(suspendedTab.id);
+      }
+      this.suspendedTabs.delete(uniqueId);
+    });
     
     if (cleanedCount > 0) {
       await this.saveSuspendedTabs();
