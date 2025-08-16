@@ -17,7 +17,7 @@ class SuspendedPage {
         const legacyId = urlParams.get('id');
         if (legacyId) {
             console.warn('Using legacy id parameter. This will be migrated to uniqueId format.');
-            return `${parseInt(legacyId)}-migration-${Date.now()}`;
+            return `migration-${crypto.randomUUID()}`;
         }
         
         console.error('No uniqueId or id parameter found in URL');
@@ -47,15 +47,15 @@ class SuspendedPage {
                 tab.uniqueId === this.uniqueId
             );
 
-            // If not found and this looks like a migration ID, try original tab ID
-            if (!this.suspendedTab && this.uniqueId.includes('-migration-')) {
-                const originalTabId = this.uniqueId.split('-migration-')[0];
+            // If not found and this looks like a migration ID, try to find by legacy fallback
+            if (!this.suspendedTab && this.uniqueId.startsWith('migration-')) {
+                // For migration IDs, try to find the first tab without a uniqueId
                 this.suspendedTab = suspendedTabs.find(tab => 
-                    tab.id === parseInt(originalTabId) && !tab.uniqueId
+                    !tab.uniqueId || tab.uniqueId === this.uniqueId
                 );
                 
                 if (this.suspendedTab) {
-                    console.log('Found suspended tab by legacy ID during migration');
+                    console.log('Found suspended tab by migration ID during fallback');
                 }
             }
 

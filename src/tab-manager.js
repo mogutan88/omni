@@ -13,8 +13,8 @@ class TabManager {
     if (data.suspendedTabs) {
       data.suspendedTabs.forEach(tab => {
         if (!tab.uniqueId || typeof tab.uniqueId !== 'string' || tab.uniqueId.trim() === '') {
-          // Use traceable migration ID to maintain connection to original tab
-          tab.uniqueId = `${tab.id}-migration-${Date.now()}`;
+          // Use unique migration ID to ensure no conflicts
+          tab.uniqueId = `migration-${crypto.randomUUID()}`;
         }
         this.suspendedTabs.set(tab.uniqueId, tab);
         this.suspendedTabIds.add(tab.id);
@@ -272,7 +272,7 @@ class TabManager {
       const totalTabs = windowsData.reduce((sum, window) => sum + window.tabs.length, 0);
       
       const session = {
-        id: `session_${Date.now()}`,
+        id: `session_${crypto.randomUUID()}`,
         name: sessionName,
         windows: windowsData,
         tabs: windowsData.flatMap(w => w.tabs), // For backward compatibility

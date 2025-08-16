@@ -39,7 +39,7 @@ class OmniManager {
 
   setupMessageListeners() {
     // Listen for tab count changes from background script
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
       if (message.type === 'TAB_COUNT_CHANGED') {
         // Update badges when tab count changes
         this.updateSidebarBadges();
@@ -1015,7 +1015,7 @@ class OmniManager {
     }
   }
 
-  filterTabs(filter) {
+  filterTabs(_filter) {
     // Implement tab filtering
     this.loadTabs();
   }
