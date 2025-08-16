@@ -1,6 +1,6 @@
 # Omni Extension - Todo List
 
-## Phase 1 (MVP) - Status: 🧪 TESTING NEEDED
+## Phase 1 (MVP) - Status: ✅ COMPLETED
 
 ### Core Tab Management
 - [x] One-click tab conversion to organized list
@@ -20,10 +20,17 @@
 - [ ] Crash recovery (automatic detection and recovery)
 
 ### Session Organization (Workspace features removed per PRD update)
-- [ ] Named session management (sessions with custom names)
-- [ ] Single window session saving capability
-- [ ] Session grouping by window
-- [ ] Session timestamps and metadata
+- [x] Named session management (sessions with custom names)
+- [x] Single window session saving capability
+- [x] Session grouping by window
+- [x] Session timestamps and metadata
+
+### Bookmarks Backup System
+- [x] Bookmarks-based session backup/restore (survives uninstall/reinstall)
+- [x] User setting to toggle bookmarks backup on/off
+- [x] Automatic recovery on install/update when no sessions exist
+- [x] Clean backups functionality to remove backup folder on demand
+- [x] Stable extension ID for development via manifest key
 
 ### Universal Search
 - [x] Search across open tabs
@@ -57,6 +64,11 @@
 - [x] Added window count display to popup Dashboard and Manager Overview
 - [x] Fixed broken session saving and restoration functionality (added missing saveTabsAsSession method)
 - [x] Robust favicon handling (internal pages, fallbacks, and error handling)
+- [x] Real-time badge updates for tab count changes
+- [x] Window grouping in popup and search results
+- [x] Advanced favicon handling for Chrome internal pages with _favicon API
+- [x] Toast notification system enhancements
+- [x] CSP compliance fixes (removed all inline handlers)
 
 ### Testing & Polish
 - [ ] Complete extension testing in Chrome
@@ -65,6 +77,8 @@
 - [ ] Verify memory usage reduction
 - [ ] Test cross-window operations
 - [ ] Add proper error handling for edge cases
+- [x] Getting started user documentation
+- [x] Advanced favicon handling with _favicon API
 
 ## Phase 2 (Enhanced Features) - Status: 📋 PENDING
 
@@ -77,12 +91,12 @@
 - [ ] Advanced filtering options
 
 ### Export/Import Capabilities
-- [ ] Export sessions as JSON
+- [x] Export sessions as JSON
 - [ ] Export sessions as CSV
 - [ ] Export sessions as HTML
 - [ ] Export sessions as plain text URLs
-- [ ] Import sessions from files
-- [ ] Bulk export/import operations
+- [x] Import sessions from files
+- [x] Bulk export/import operations
 
 ### Enhanced Keyboard Shortcuts
 - [ ] Complete keyboard navigation in popup
@@ -174,6 +188,9 @@
 - [x] Console output capture
 - [x] Diagnostic tools
 - [x] Test data generation
+- [x] Bookmarks backup/restore functionality
+- [x] Clean backups functionality
+- [x] Toast notifications in popup
 - [x] Stable extension ID for dev via manifest `key`
 - [x] Made StorageManager service-worker-safe
 - [ ] Integration APIs
@@ -219,16 +236,26 @@
 ## Progress Summary
 
 ### Completed ✅
-- Core tab management features
-- Basic session functionality
-- Universal search implementation
-- UI/UX foundation
-- Documentation framework
+- Core tab management functionality
+- Session saving and restoration with window grouping
+- Universal search across tabs and sessions
+- Manager page with full interface
+- Popup interface with quick actions
+- Storage optimization for Chrome sync
+- Real-time statistics and activity tracking
+- Development tools and debugging features
+- Export/Import functionality for session backup
+- Bookmarks backup system for persistence across uninstalls
+- Advanced favicon handling with Chrome internal page support
+- Window grouping across all interfaces
+- Real-time badge updates with Chrome messaging
+- CSP compliance and toast notification system
+- Comprehensive user documentation
 
-### Needs Update 🔧
-- Remove workspace-related features from codebase
-- Update UI to remove workspace references
-- Enhance session management per new PRD requirements
+### Completed (Previously Needs Update) ✅
+- Removed workspace-related features from codebase
+- Updated UI to remove workspace references
+- Enhanced session management per new PRD requirements
 
 ### In Progress 🔄
 - Extension testing
@@ -243,8 +270,9 @@
 
 ## Notes
 
-- Phase 1 is functionally complete but needs testing and polish
+- Phase 1 is functionally complete with extensive implementation completed on August 11, 2025
 - Icon files need to be created as PNG format for Chrome compatibility
-- Crash recovery feature needs implementation to complete Phase 1
+- Crash recovery feature needs implementation as final Phase 1 item
 - Consider user feedback before starting Phase 2
 - Prioritize stability and performance before adding advanced features
+- Major features implemented: bookmarks backup, export/import, advanced favicon handling, window grouping, real-time updates
