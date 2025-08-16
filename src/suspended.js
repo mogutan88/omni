@@ -67,27 +67,26 @@ class SuspendedPage {
         }
 
         try {
-            // chrome.tabs.getCurrent() can return undefined in certain contexts (e.g., when called from a popup or background script).
-            // In such cases, we create a new tab as a fallback.
-            const currentTab = await chrome.tabs.getCurrent();
-            if (!currentTab) {
-                await chrome.tabs.create({ url: this.suspendedTab.url });
-                return;
-            }
-            await chrome.tabs.update(currentTab.id, { 
-                url: this.suspendedTab.url 
+            // Send message to background script to handle restoration through TabManager
+            const response = await chrome.runtime.sendMessage({
+                type: 'RESTORE_TAB',
+                uniqueId: this.uniqueId
             });
 
-            const data = await chrome.storage.local.get(['suspendedTabs']);
-            const suspendedTabs = data.suspendedTabs || [];
-            const updatedTabs = suspendedTabs.filter(tab => 
-                tab.uniqueId !== this.suspendedTab.uniqueId
-            );
-            await chrome.storage.local.set({ suspendedTabs: updatedTabs });
-
+            if (!response || !response.success) {
+                console.error('Failed to restore tab:', response?.error);
+                // Fallback: create new tab with the original URL
+                await chrome.tabs.create({ url: this.suspendedTab.url });
+            }
         } catch (error) {
-            console.error('Error restoring tab:', error);
-            await chrome.tabs.create({ url: this.suspendedTab.url });
+            console.error('Error sending restore message:', error);
+            // Fallback: create new tab with the original URL
+            try {
+                await chrome.tabs.create({ url: this.suspendedTab.url });
+            } catch (createError) {
+                console.error('Error creating fallback tab:', createError);
+                alert('Unable to restore tab. Please try again.');
+            }
         }
     }
 

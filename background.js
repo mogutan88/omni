@@ -1,8 +1,10 @@
 importScripts('src/storage-manager.js');
+importScripts('src/tab-manager.js');
 
 class OmniBackground {
   constructor() {
     this.storageManager = new StorageManager();
+    this.tabManager = new TabManager();
     this.lastNotificationTime = 0;
     this.notificationThrottle = 500; // 500ms throttle
     this.initializeEventListeners();
@@ -11,6 +13,12 @@ class OmniBackground {
   initializeEventListeners() {
     chrome.commands.onCommand.addListener((command) => {
       this.handleCommand(command);
+    });
+
+    // Handle messages from content scripts (like suspended.js)
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      this.handleMessage(message, sender, sendResponse);
+      return true; // Keep message channel open for async response
     });
 
     // Attempt recovery from bookmarks on install/update if needed
@@ -43,6 +51,33 @@ class OmniBackground {
     chrome.windows.onCreated.addListener((window) => {
       this.notifyTabCountChanged();
     });
+  }
+
+  async handleMessage(message, sender, sendResponse) {
+    try {
+      switch (message.type) {
+        case 'RESTORE_TAB':
+          const success = await this.tabManager.restoreTab(message.uniqueId);
+          sendResponse({ success });
+          break;
+        
+        case 'SUSPEND_TAB':
+          const suspended = await this.tabManager.suspendTab(message.tabId);
+          sendResponse({ success: suspended });
+          break;
+          
+        default:
+          sendResponse({ error: `Unknown message type: ${message.type}` });
+      }
+    } catch (error) {
+      console.error('Error handling message:', error);
+      sendResponse({ error: error.message });
+    }
+  }
+
+  async handleCommand(command) {
+    // Command handling implementation can be added here
+    console.log('Command received:', command);
   }
 
   async saveSession(name, tabs) {

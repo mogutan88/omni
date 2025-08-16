@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tab Suspension Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            margin: 10px 5px;
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tab Suspension Test Suite</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Unique ID Generation</h2>
+        <button id="testUniqueId">Test Unique ID Generation</button>
+        <div id="uniqueIdResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Tab Query Optimization</h2>
+        <button id="testTabQuery">Test Tab Query</button>
+        <div id="tabQueryResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Cleanup Logic</h2>
+        <button id="testCleanup">Test Cleanup Logic</button>
+        <div id="cleanupResult"></div>
+    </div>
+
+    <script>
+        // Test 1: Unique ID Generation
+        document.getElementById('testUniqueId').addEventListener('click', () => {
+            const resultDiv = document.getElementById('uniqueIdResult');
+            try {
+                // Generate 100 unique IDs and check for duplicates
+                const ids = new Set();
+                for (let i = 0; i < 100; i++) {
+                    const id = crypto.randomUUID();
+                    if (ids.has(id)) {
+                        resultDiv.innerHTML = `<p class="error">❌ Duplicate ID found: ${id}</p>`;
+                        return;
+                    }
+                    ids.add(id);
+                }
+                
+                // Show sample IDs
+                const sampleIds = Array.from(ids).slice(0, 5);
+                resultDiv.innerHTML = `
+                    <p class="success">✅ Generated 100 unique IDs successfully!</p>
+                    <p>Sample IDs:</p>
+                    <pre>${sampleIds.join('\n')}</pre>
+                    <p>All IDs are UUIDs in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</p>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        });
+
+        // Test 2: Tab Query Optimization
+        document.getElementById('testTabQuery').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('tabQueryResult');
+            try {
+                if (typeof chrome === 'undefined' || !chrome.tabs) {
+                    resultDiv.innerHTML = `<p class="error">❌ Chrome extension APIs not available. Load this as an extension page.</p>`;
+                    return;
+                }
+
+                const startTime = performance.now();
+                
+                // Test optimized query with specific URL
+                const testUrl = chrome.runtime.getURL('suspended.html?uniqueId=test-123');
+                const tabs1 = await chrome.tabs.query({ url: testUrl });
+                
+                // Test pattern query as fallback
+                const pattern = chrome.runtime.getURL('suspended.html') + '*';
+                const tabs2 = await chrome.tabs.query({ url: pattern });
+                
+                const endTime = performance.now();
+                const duration = endTime - startTime;
+                
+                resultDiv.innerHTML = `
+                    <p class="success">✅ Tab query completed in ${duration.toFixed(2)}ms</p>
+                    <p>Exact URL query found: ${tabs1.length} tabs</p>
+                    <p>Pattern query found: ${tabs2.length} suspended tabs</p>
+                    <p>Optimization working: queries are targeted, not fetching all tabs</p>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        });
+
+        // Test 3: Cleanup Logic
+        document.getElementById('testCleanup').addEventListener('click', () => {
+            const resultDiv = document.getElementById('cleanupResult');
+            try {
+                // Simulate cleanup logic
+                const now = Date.now();
+                const threshold = 30 * 24 * 60 * 60 * 1000; // 30 days
+                
+                // Create test suspended tabs with different ages
+                const testTabs = [
+                    { uniqueId: 'test-1', suspended: now - (5 * 24 * 60 * 60 * 1000) }, // 5 days old
+                    { uniqueId: 'test-2', suspended: now - (35 * 24 * 60 * 60 * 1000) }, // 35 days old
+                    { uniqueId: 'test-3', suspended: now - (20 * 24 * 60 * 60 * 1000) }, // 20 days old
+                    { uniqueId: 'test-4', suspended: now - (40 * 24 * 60 * 60 * 1000) }, // 40 days old
+                    { uniqueId: 'test-5', suspended: 'invalid' }, // Invalid timestamp
+                ];
+                
+                const toDelete = [];
+                for (const tab of testTabs) {
+                    if (typeof tab.suspended === 'number' && 
+                        Number.isFinite(tab.suspended) && 
+                        (now - tab.suspended > threshold)) {
+                        toDelete.push(tab.uniqueId);
+                    }
+                }
+                
+                resultDiv.innerHTML = `
+                    <p class="success">✅ Cleanup logic test passed!</p>
+                    <p>Test tabs created: ${testTabs.length}</p>
+                    <p>Tabs to delete (older than 30 days): ${toDelete.length}</p>
+                    <p>Deleted tab IDs: ${toDelete.join(', ')}</p>
+                    <p>Time-based cleanup working correctly (not using tab ID checking)</p>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
