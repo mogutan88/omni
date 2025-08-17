@@ -232,7 +232,7 @@ class TabManager {
       console.log('Restoring tab:', targetTab.id, 'to URL:', suspendedTab.url);
       await chrome.tabs.update(targetTab.id, { url: suspendedTab.url });
       this.suspendedTabs.delete(uniqueId);
-      this.suspendedTabIds.delete(targetTab.id); // Use current tab ID, not original suspended tab ID
+      this.suspendedTabIds.delete(suspendedTab.id); // Remove original suspended tab's ID from suspendedTabIds
       await this.saveSuspendedTabs();
 
       return true;
