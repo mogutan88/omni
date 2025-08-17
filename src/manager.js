@@ -454,27 +454,29 @@ class OmniManager {
 
   async loadTabs() {
     try {
-      let tabs = await this.tabManager.getAllTabs();
+      const allTabs = await this.tabManager.getAllTabs();
       const container = document.getElementById('tabsContainer');
+      
+      // Store original tabs for stats
+      let tabs = allTabs;
       
       // Apply filter if one is active
       if (this.currentTabFilter && this.currentTabFilter !== 'all') {
         switch (this.currentTabFilter) {
           case 'active':
-            tabs = tabs.filter(t => !t.suspended);
+            tabs = allTabs.filter(t => !t.suspended);
             break;
           case 'suspended':
-            tabs = tabs.filter(t => t.suspended);
+            tabs = allTabs.filter(t => t.suspended);
             break;
           case 'grouped':
             // Filter tabs that are in tab groups (Chrome tab groups)
-            tabs = tabs.filter(t => t.groupId && t.groupId !== -1);
+            tabs = allTabs.filter(t => t.groupId && t.groupId !== -1);
             break;
         }
       }
       
       // Update stats (always show total counts, not filtered)
-      const allTabs = await this.tabManager.getAllTabs();
       document.getElementById('totalTabCount').textContent = allTabs.length;
       document.getElementById('activeTabCount').textContent = allTabs.filter(t => !t.suspended).length;
       document.getElementById('suspendedTabCount').textContent = allTabs.filter(t => t.suspended).length;
